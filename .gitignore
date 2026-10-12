@@ -1,0 +1,5 @@
+node_modules/
+*.log
+*.tmp
+countersign.config.json
+.env
