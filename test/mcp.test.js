@@ -1,0 +1,52 @@
+// SPDX-License-Identifier: Apache-2.0
+// Copyright 2026 Marco Gernand
+
+import assert from 'node:assert/strict';
+import { spawn } from 'node:child_process';
+import fs from 'node:fs';
+import path from 'node:path';
+import test from 'node:test';
+import { createServer } from '../src/mcp.js';
+import { tools } from '../src/tools.js';
+import { setup } from './helpers.js';
+
+test('MCP: initialize, list tools, call tool, structured errors', async (t) => {
+  const { mailbox, gh } = setup(t);
+  gh.addIssue(3, { labels: [{ name: 'to:agent-a' }] });
+  const server = createServer({ name: 'countersign', version: '0.0.0-test', tools: tools(mailbox) });
+  const init = await server.handle({ jsonrpc: '2.0', id: 1, method: 'initialize', params: { protocolVersion: '2025-03-26', capabilities: {}, clientInfo: { name: 't', version: '0' } } });
+  assert.equal(init.result.protocolVersion, '2025-03-26');
+  assert.equal(await server.handle({ jsonrpc: '2.0', method: 'notifications/initialized' }), null);
+  const list = await server.handle({ jsonrpc: '2.0', id: 2, method: 'tools/list' });
+  assert.deepEqual(list.result.tools.map((x) => x.name), ['inbox', 'read', 'comment', 'label', 'propose', 'review']);
+  const call = await server.handle({ jsonrpc: '2.0', id: 3, method: 'tools/call', params: { name: 'inbox', arguments: {} } });
+  assert.equal(call.result.isError, undefined);
+  assert.equal(call.result.structuredContent.items[0].number, 3);
+  const bad = await server.handle({ jsonrpc: '2.0', id: 4, method: 'tools/call', params: { name: 'comment', arguments: { number: 3, body: 'x', repo: 'other/repo' } } });
+  assert.equal(bad.result.isError, true);
+  assert.match(bad.result.content[0].text, /not allowed/);
+  const policy = await server.handle({ jsonrpc: '2.0', id: 5, method: 'tools/call', params: { name: 'label', arguments: { number: 3, add: ['approved'] } } });
+  assert.equal(JSON.parse(policy.result.content[0].text).error, 'POLICY');
+  const unknown = await server.handle({ jsonrpc: '2.0', id: 6, method: 'resources/list' });
+  assert.equal(unknown.error.code, -32601);
+});
+
+test('MCP: tool descriptions stay small (context budget)', (t) => {
+  const { mailbox } = setup(t);
+  const size = JSON.stringify(tools(mailbox).map(({ name, description, inputSchema }) => ({ name, description, inputSchema }))).length;
+  assert.ok(size < 4000, `tool definitions are ${size} chars`);
+});
+
+test('CLI: serve speaks MCP over stdio', async (t) => {
+  const { dir } = setup(t);
+  const cfg = path.join(dir, 'countersign.config.json');
+  fs.writeFileSync(cfg, JSON.stringify({ repository: 'example-org/example-repo', agent: 'agent-a', receiptsFile: path.join(dir, 'r.json') }));
+  const cli = new URL('../src/cli.js', import.meta.url).pathname;
+  const child = spawn(process.execPath, [cli, 'serve', '--config', cfg], { env: { ...process.env, COUNTERSIGN_TOKEN: 'synthetic' } });
+  t.after(() => child.kill());
+  let out = '';
+  const reply = new Promise((resolve) => child.stdout.on('data', (b) => { out += b; if (out.includes('\n')) resolve(JSON.parse(out.split('\n')[0])); }));
+  child.stdin.write(JSON.stringify({ jsonrpc: '2.0', id: 1, method: 'tools/list' }) + '\n');
+  const res = await reply;
+  assert.equal(res.result.tools.length, 6);
+});

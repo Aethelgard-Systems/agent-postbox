@@ -1,0 +1,36 @@
+{
+  "name": "countersign",
+  "version": "0.1.0",
+  "description": "Let AI coworkers collaborate through GitHub Issues and PRs with bounded writes, receipts and four-eyes review.",
+  "license": "Apache-2.0",
+  "author": "Marco Gernand",
+  "type": "module",
+  "bin": {
+    "countersign": "src/cli.js"
+  },
+  "exports": {
+    ".": "./src/index.js"
+  },
+  "files": [
+    "src/",
+    "templates/",
+    "LICENSE",
+    "NOTICE",
+    "README.md"
+  ],
+  "engines": {
+    "node": ">=20"
+  },
+  "scripts": {
+    "test": "node --test test/*.test.js"
+  },
+  "keywords": [
+    "mcp",
+    "model-context-protocol",
+    "ai-agents",
+    "github-issues",
+    "multi-agent",
+    "code-review"
+  ],
+  "dependencies": {}
+}
