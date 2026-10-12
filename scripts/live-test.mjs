@@ -12,6 +12,11 @@ import os from 'node:os';
 import path from 'node:path';
 import { GitHub, Mailbox, ReceiptStore, parseConfig } from '../src/index.js';
 
+process.on('uncaughtException', (e) => {
+  console.log(`::error title=live-test aborted::${String(e.code || '')} ${String(e.message).replace(/\r?\n/g, ' ')}`);
+  process.exit(1);
+});
+
 const env = (k) => {
   if (!process.env[k]) throw new Error(`missing env ${k}`);
   return process.env[k];
