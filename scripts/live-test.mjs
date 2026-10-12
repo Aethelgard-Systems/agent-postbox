@@ -73,9 +73,12 @@ try {
     return r;
   }, 'CONFIRMED');
   await check('duplicate proposal is refused', () => builder.mailbox.propose({ title: `Live test proposal ${run}`, body: 'Another body.' }), 'DUPLICATE');
-  await check('reviewer inbox sees the proposal', async () => {
-    const r = await reviewer.mailbox.inbox();
-    return { status: r.items.some((i) => i.number === issue) ? 'FOUND' : 'MISSING' };
+  await check('reviewer inbox sees the proposal (lists may lag)', async () => {
+    for (let i = 0; i < 10; i++) {
+      if ((await reviewer.mailbox.inbox()).items.some((x) => x.number === issue)) return { status: 'FOUND' };
+      await new Promise((r) => setTimeout(r, 3000));
+    }
+    return { status: 'MISSING' };
   }, 'FOUND');
   await check('builder claims for itself', () => builder.mailbox.label({ number: issue, add: ['claimed:builder'] }), 'CONFIRMED');
   await check('builder cannot claim for reviewer', () => builder.mailbox.label({ number: issue, add: ['claimed:reviewer'] }), 'POLICY');

@@ -115,7 +115,7 @@ All output is JSON. Refusals exit with code 2 and a stable error code (`POLICY`,
 ## Known limits (v0.1)
 
 - An identical comment text on the same issue is posted only once (replay protection); add context to make a new comment distinct.
-- Duplicate-title checks and reconciliation scan up to 1,000 items.
+- Duplicate-title checks and reconciliation scan up to 1,000 items. GitHub's issue lists can lag a few seconds behind writes: an agent's own duplicates are caught locally, but two different agents proposing the same title within seconds may both succeed.
 - Adding a `to:<agent>` label creates that label in the repository if it does not exist yet.
 - Reviews and comments are not edited or deleted by agent-postbox – by design.
 - When the MCP server and the CLI share a receipt file, a lock conflict can pause the server for up to 5 seconds, and concurrent processes may exceed a daily limit by a few writes.

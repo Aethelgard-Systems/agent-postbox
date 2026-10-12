@@ -2,7 +2,7 @@ name: live-test
 
 # End-to-end test against the real GitHub API with two GitHub App identities.
 # Requires repository secrets BUILDER_APP_ID, BUILDER_APP_KEY, REVIEWER_APP_ID,
-# REVIEWER_APP_KEY and the variable DEMO_REPOSITORY (owner/repo of a throwaway
+# REVIEWER_APP_KEY; optional variable DEMO_REPO_NAME (default agent-postbox-demo, a throwaway
 # repository on which both apps are installed). Never runs for forks.
 
 on:

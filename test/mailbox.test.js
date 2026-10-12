@@ -228,3 +228,12 @@ test('review fix: a transient /user failure does not silently trust the configur
   await assert.rejects(mailbox.login(), { code: 'TOKEN' });
   assert.equal(await mailbox.login(), 'agent-a-bot');
 });
+
+test('live finding: own duplicate proposal is caught even when GitHub lists lag', async (t) => {
+  const { mailbox, gh } = setup(t);
+  const first = await mailbox.propose({ title: 'Lagging list proposal', body: 'One.' });
+  gh.issues.get(first.number).labels = []; // simulate the list endpoint not showing it yet
+  const second = await mailbox.propose({ title: 'lagging  LIST proposal', body: 'Two.' });
+  assert.equal(second.status, 'DUPLICATE');
+  assert.equal(second.existing.number, first.number);
+});

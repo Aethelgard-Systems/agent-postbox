@@ -315,6 +315,11 @@ export class Mailbox {
     const full = `${text}\n\n---\n_Proposed by agent \`${this.agent}\` via agent-postbox. A proposal carries no authority; a human decides._\n${marker(this.agent, key)}`;
     const matches = async (i) => i && !i.pull_request && i.title === t && i.body === full && (await this.#mine(i));
     const prior = this.receipts.get(key);
+    // GitHub's issue lists lag a few seconds behind writes, so this agent's own
+    // recent proposals are checked locally (by title hash, never the title itself).
+    const titleHash = receiptKey(['title', this.config.repository, norm(t)]);
+    const own = this.receipts.list().find((r) => r.kind === 'propose' && r.state === STATE.CONFIRMED && r.target?.titleHash === titleHash && r.key !== key);
+    if (own) return { status: 'DUPLICATE', existing: { number: own.result?.number, url: own.result?.url }, note: 'this agent already proposed the same title' };
     if (!prior || prior.state === STATE.FAILED) {
       const open = await this.#all(issuesPath, { state: 'open', labels: this.config.proposalLabel });
       const dup = open.find((i) => !i.pull_request && norm(i.title) === norm(t));
@@ -323,7 +328,7 @@ export class Mailbox {
     return this.#write({
       kind: 'propose',
       key,
-      target: { kind: 'issue' },
+      target: { kind: 'issue', titleHash },
       perform: async () => (await this.github.request('POST', issuesPath, { body: { title: t, body: full, labels: all } })).data,
       readback: async (issue) => {
         const { data } = await this.github.request('GET', this.github.repoUrl(`/issues/${issue.number}`));
