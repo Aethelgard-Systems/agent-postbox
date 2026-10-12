@@ -102,6 +102,12 @@ try {
 
 const failed = results.filter((r) => !r.ok);
 console.log(`\n${results.length - failed.length}/${results.length} live checks passed`);
+if (process.env.GITHUB_ACTIONS) {
+  // One annotation with all results, readable through the checks API.
+  const lines = results.map((r) => `${r.ok ? 'PASS' : 'FAIL'} ${r.name}: expected ${r.expect}, got ${r.outcome}`);
+  const level = failed.length ? 'error' : 'notice';
+  console.log(`::${level} title=live-test ${results.length - failed.length}/${results.length}::${lines.join('%0A').replace(/\r?\n/g, ' ')}`);
+}
 const summary = process.env.GITHUB_STEP_SUMMARY;
 if (summary) {
   fs.appendFileSync(summary, `## agent-postbox live test\n\n| Result | Check | Expected | Got |\n|---|---|---|---|\n${results.map((r) => `| ${r.ok ? '✅' : '❌'} | ${r.name} | ${r.expect} | ${r.outcome} |`).join('\n')}\n`);
