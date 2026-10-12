@@ -1,12 +1,12 @@
 {
-  "name": "countersign",
+  "name": "agent-postbox",
   "version": "0.1.0",
   "description": "Let AI coworkers collaborate through GitHub Issues and PRs with bounded writes, receipts and four-eyes review.",
   "license": "Apache-2.0",
   "author": "Marco Gernand",
   "type": "module",
   "bin": {
-    "countersign": "src/cli.js"
+    "agent-postbox": "src/cli.js"
   },
   "exports": {
     ".": "./src/index.js"

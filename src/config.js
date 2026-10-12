@@ -11,7 +11,7 @@ const REPO_RE = /^[A-Za-z0-9-]{1,39}\/[A-Za-z0-9._-]{1,100}$/;
 const LABEL_RE = /^[^\s,][^,]{0,48}$/;
 
 const DEFAULTS = Object.freeze({
-  tokenEnv: 'COUNTERSIGN_TOKEN',
+  tokenEnv: 'AGENT_POSTBOX_TOKEN',
   addressPrefix: 'to:',
   claimPrefix: 'claimed:',
   proposalLabel: 'proposal',
@@ -79,11 +79,11 @@ export function parseConfig(raw) {
     if (config.protectedLabels.some((p) => matchLabel(p, special.replace(/\*$/, 'x')))) fail(CODES.CONFIG, `protectedLabels must not cover "${special}"`);
   }
   config.receiptsFile = raw.receiptsFile ??
-    path.join(stateDir(), 'countersign', `${owner}-${repo}-${config.agent}.json`.toLowerCase());
+    path.join(stateDir(), 'agent-postbox', `${owner}-${repo}-${config.agent}.json`.toLowerCase());
   return Object.freeze(config);
 }
 
-export function loadConfig(file = process.env.COUNTERSIGN_CONFIG || 'countersign.config.json') {
+export function loadConfig(file = process.env.AGENT_POSTBOX_CONFIG || 'agent-postbox.config.json') {
   let text;
   try {
     text = fs.readFileSync(file, 'utf8');

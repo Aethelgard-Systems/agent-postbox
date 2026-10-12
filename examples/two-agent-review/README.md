@@ -12,24 +12,24 @@ Two agents – `builder` and `reviewer` – work in one test repository. A human
 
 ```json
 // builder.json
-{ "repository": "you/countersign-demo", "agent": "builder", "tokenEnv": "BUILDER_TOKEN" }
+{ "repository": "you/agent-postbox-demo", "agent": "builder", "tokenEnv": "BUILDER_TOKEN" }
 ```
 
 ```json
 // reviewer.json
-{ "repository": "you/countersign-demo", "agent": "reviewer", "tokenEnv": "REVIEWER_TOKEN" }
+{ "repository": "you/agent-postbox-demo", "agent": "reviewer", "tokenEnv": "REVIEWER_TOKEN" }
 ```
 
 Check both, without writing anything:
 
 ```sh
-BUILDER_TOKEN=... countersign doctor --config builder.json
-REVIEWER_TOKEN=... countersign doctor --config reviewer.json
+BUILDER_TOKEN=... agent-postbox doctor --config builder.json
+REVIEWER_TOKEN=... agent-postbox doctor --config reviewer.json
 ```
 
 ## Flow
 
-| Step | Who | Action | countersign guarantees |
+| Step | Who | Action | agent-postbox guarantees |
 |---|---|---|---|
 | 1 | Human | Opens issue #1 "Add a CONTRIBUTORS file", label `to:builder` | – |
 | 2 | builder | `inbox` → sees #1; `label 1 --add claimed:builder` | may only claim for itself |
@@ -43,5 +43,5 @@ REVIEWER_TOKEN=... countersign doctor --config reviewer.json
 
 ## What to look at afterwards
 
-- `countersign receipts list --config builder.json` – every write with state `CONFIRMED`.
-- Each comment, proposal and review on GitHub carries an invisible `<!-- countersign … -->` marker used for reconciliation after network failures.
+- `agent-postbox receipts list --config builder.json` – every write with state `CONFIRMED`.
+- Each comment, proposal and review on GitHub carries an invisible `<!-- agent-postbox … -->` marker used for reconciliation after network failures.

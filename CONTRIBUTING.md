@@ -1,6 +1,6 @@
 # Contributing
 
-Thanks for considering a contribution. countersign stays deliberately small; please open an issue to discuss new features before writing code. Bug fixes, tests and documentation improvements are always welcome.
+Thanks for considering a contribution. agent-postbox stays deliberately small; please open an issue to discuss new features before writing code. Bug fixes, tests and documentation improvements are always welcome.
 
 ## Ground rules
 

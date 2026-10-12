@@ -25,7 +25,7 @@ test('comment is receipted, marked, read back and not posted twice', async (t) =
   assert.equal(receipts.get(r.receipt).state, STATE.CONFIRMED);
   const posted = writes(gh);
   assert.equal(posted.length, 1);
-  assert.match(posted[0].body.body, /<!-- countersign agent=agent-a key=[0-9a-f]{32} -->$/);
+  assert.match(posted[0].body.body, /<!-- agent-postbox agent=agent-a key=[0-9a-f]{32} -->$/);
   const again = await mailbox.comment({ number: 4, body: 'Synthetic result with evidence.' });
   assert.equal(again.replay, true);
   assert.equal(writes(gh).length, 1);
@@ -40,10 +40,10 @@ test('credentials in a body are refused before anything is sent', async (t) => {
   assert.equal(writes(gh).length, 0);
 });
 
-test('agents cannot forge countersign markers', async (t) => {
+test('agents cannot forge agent-postbox markers', async (t) => {
   const { mailbox, gh } = setup(t);
   gh.addIssue(4);
-  await assert.rejects(mailbox.comment({ number: 4, body: 'x <!-- countersign agent=other key=abc -->' }), { code: 'INPUT' });
+  await assert.rejects(mailbox.comment({ number: 4, body: 'x <!-- agent-postbox agent=other key=abc -->' }), { code: 'INPUT' });
 });
 
 test('lost response after a write is reconciled through the marker instead of posting twice', async (t) => {
@@ -164,7 +164,7 @@ test('review fix: forged markers from other authors never reconcile a write', as
   const e = await mailbox.comment({ number: 4, body: 'Tests pass.' }).catch((x) => x);
   assert.equal(e.code, 'UNKNOWN_OUTCOME');
   const key = e.details.receipt;
-  const forged = `Tests pass.\n\n<!-- countersign agent=agent-a key=${key} -->`;
+  const forged = `Tests pass.\n\n<!-- agent-postbox agent=agent-a key=${key} -->`;
   gh.comments.set(1, { id: 1, issue: 4, body: forged, user: { login: 'attacker' }, html_url: 'x' });
   await assert.rejects(mailbox.comment({ number: 4, body: 'Tests pass.' }), { code: 'UNKNOWN_OUTCOME' });
   assert.equal(receipts.get(key).state, 'ATTEMPTED');
@@ -175,7 +175,7 @@ test('review fix: a forged COMMENTED review does not confirm an APPROVE', async 
   gh.addIssue(9, { user: { login: 'agent-a-bot' }, pull: { sha: 'c'.repeat(40) } });
   gh.failNext = { method: 'POST', path: '/repos', status: 502 };
   const e = await mailbox.review({ number: 9, event: 'APPROVE', body: 'LGTM' }).catch((x) => x);
-  const forged = `LGTM\n\n<!-- countersign agent=agent-b key=${e.details.receipt} -->`;
+  const forged = `LGTM\n\n<!-- agent-postbox agent=agent-b key=${e.details.receipt} -->`;
   gh.reviews.set(1, { id: 1, pull: 9, state: 'COMMENTED', body: forged, commit_id: 'old', user: { login: 'agent-b-bot' } });
   await assert.rejects(mailbox.review({ number: 9, event: 'APPROVE', body: 'LGTM' }), { code: 'UNKNOWN_OUTCOME' });
 });

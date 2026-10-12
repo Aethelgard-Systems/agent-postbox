@@ -3,7 +3,7 @@
 
 /**
  * In-memory stand-in for the GitHub REST API, covering only the endpoints
- * countersign may call. Synthetic data only.
+ * agent-postbox may call. Synthetic data only.
  */
 export function fakeGitHub({ owner = 'example-org', repo = 'example-repo', login = 'agent-a-bot', classicScopes } = {}) {
   const base = `/repos/${owner}/${repo}`;

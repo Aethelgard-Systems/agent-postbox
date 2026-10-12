@@ -2,7 +2,7 @@
 // Copyright 2026 Marco Gernand
 
 import readline from 'node:readline';
-import { CountersignError } from './errors.js';
+import { PostboxError } from './errors.js';
 import { validate } from './schema.js';
 
 /**
@@ -26,8 +26,8 @@ export function createServer({ name, version, instructions, tools }) {
       const result = await tool.run(args);
       return { content: [{ type: 'text', text: JSON.stringify(result, null, 2) }], structuredContent: result };
     } catch (e) {
-      const payload = e instanceof CountersignError ? e.toJSON() : { error: 'INTERNAL', message: 'internal error' };
-      if (!(e instanceof CountersignError)) process.stderr.write(`countersign: ${e.stack || e}\n`);
+      const payload = e instanceof PostboxError ? e.toJSON() : { error: 'INTERNAL', message: 'internal error' };
+      if (!(e instanceof PostboxError)) process.stderr.write(`agent-postbox: ${e.stack || e}\n`);
       return { content: [{ type: 'text', text: JSON.stringify(payload, null, 2) }], isError: true };
     }
   }

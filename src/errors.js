@@ -19,10 +19,10 @@ export const CODES = Object.freeze({
   TOKEN: 'TOKEN',
 });
 
-export class CountersignError extends Error {
+export class PostboxError extends Error {
   constructor(code, message, details) {
     super(message);
-    this.name = 'CountersignError';
+    this.name = 'PostboxError';
     this.code = code;
     if (details !== undefined) this.details = details;
   }
@@ -33,5 +33,5 @@ export class CountersignError extends Error {
 }
 
 export const fail = (code, message, details) => {
-  throw new CountersignError(code, message, details);
+  throw new PostboxError(code, message, details);
 };

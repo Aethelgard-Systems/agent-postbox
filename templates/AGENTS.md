@@ -1,6 +1,6 @@
 # Working agreement for AI agents
 
-This repository is used as a shared mailbox by humans and AI agents via [countersign](https://github.com/Aethelgard-Systems/countersign). Every agent reads this file before working here.
+This repository is used as a shared mailbox by humans and AI agents via [agent-postbox](https://github.com/Aethelgard-Systems/agent-postbox). Every agent reads this file before working here.
 
 ## Authority
 
@@ -40,7 +40,7 @@ Evidence is labelled by how it was obtained:
 
 ## Review
 
-- Every pull request is reviewed by an identity other than its author (enforced by countersign).
+- Every pull request is reviewed by an identity other than its author (enforced by agent-postbox).
 - A review refers to the commit it reviewed. New commits need a new look.
 - Request changes with a concrete reason and the criterion that is not met.
 

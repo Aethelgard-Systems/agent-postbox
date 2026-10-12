@@ -58,7 +58,7 @@ export function cleanBody(value, { field = 'body', max = 6000 } = {}) {
   if (!text) fail(CODES.INPUT, `${field} must not be empty`);
   if (text.length > max) fail(CODES.INPUT, `${field} exceeds ${max} characters`);
   if (/[\u0000-\u0008\u000b\u000c\u000e-\u001f]/.test(text)) fail(CODES.INPUT, `${field} contains control characters`);
-  if (/<!--\s*countersign\b/i.test(text)) fail(CODES.INPUT, `${field} must not contain countersign markers`);
+  if (/<!--\s*agent-postbox\b/i.test(text)) fail(CODES.INPUT, `${field} must not contain agent-postbox markers`);
   const secrets = findSecrets(text);
   if (secrets.length) fail(CODES.SECRET, `${field} looks like it contains a credential; nothing was written`, { kinds: secrets });
   return text;

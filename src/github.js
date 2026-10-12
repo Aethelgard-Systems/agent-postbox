@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: Apache-2.0
 // Copyright 2026 Marco Gernand
 
-import { CODES, CountersignError, fail } from './errors.js';
+import { CODES, PostboxError, fail } from './errors.js';
 
 /**
  * Minimal GitHub REST client bound to exactly one repository.
@@ -29,7 +29,7 @@ const ALLOWED = [
   ['GET', new RegExp(`^/repos/R/pulls/${N}/reviews/${N}$`)],
 ];
 
-export class GitHubError extends CountersignError {
+export class GitHubError extends PostboxError {
   constructor(status, message) {
     super(CODES.GITHUB, `GitHub API ${status}: ${message}`, { status });
     this.status = status;
@@ -42,7 +42,7 @@ export class GitHubError extends CountersignError {
 }
 
 export class GitHub {
-  constructor({ owner, repo, token, fetch: fetchImpl = globalThis.fetch, baseUrl = 'https://api.github.com', userAgent = 'countersign' }) {
+  constructor({ owner, repo, token, fetch: fetchImpl = globalThis.fetch, baseUrl = 'https://api.github.com', userAgent = 'agent-postbox' }) {
     if (!token) fail(CODES.TOKEN, 'missing GitHub token');
     this.owner = owner;
     this.repo = repo;

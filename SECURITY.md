@@ -10,13 +10,13 @@ Never include real tokens or credentials in a report. Synthetic examples are eno
 
 ## In scope
 
-- Any way to make countersign perform a write outside its endpoint allowlist or outside the configured repository
+- Any way to make agent-postbox perform a write outside its endpoint allowlist or outside the configured repository
 - Bypassing the four-eyes check, label policy, daily limits or receipts
 - Token disclosure through output, errors or the receipt file
-- Prompt-injection paths where content read by countersign is executed as a tool action *by countersign itself*
+- Prompt-injection paths where content read by agent-postbox is executed as a tool action *by agent-postbox itself*
 
 ## Out of scope
 
 - Actions taken by someone holding the token directly against the GitHub API
 - Secrets the best-effort filter does not recognise (please still tell us about common formats we miss)
-- Behaviour of the AI agent or MCP client using countersign
+- Behaviour of the AI agent or MCP client using agent-postbox

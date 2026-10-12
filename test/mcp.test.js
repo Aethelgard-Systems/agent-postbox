@@ -13,7 +13,7 @@ import { setup } from './helpers.js';
 test('MCP: initialize, list tools, call tool, structured errors', async (t) => {
   const { mailbox, gh } = setup(t);
   gh.addIssue(3, { labels: [{ name: 'to:agent-a' }] });
-  const server = createServer({ name: 'countersign', version: '0.0.0-test', tools: tools(mailbox) });
+  const server = createServer({ name: 'agent-postbox', version: '0.0.0-test', tools: tools(mailbox) });
   const init = await server.handle({ jsonrpc: '2.0', id: 1, method: 'initialize', params: { protocolVersion: '2025-03-26', capabilities: {}, clientInfo: { name: 't', version: '0' } } });
   assert.equal(init.result.protocolVersion, '2025-03-26');
   assert.equal(await server.handle({ jsonrpc: '2.0', method: 'notifications/initialized' }), null);
@@ -39,10 +39,10 @@ test('MCP: tool descriptions stay small (context budget)', (t) => {
 
 test('CLI: serve speaks MCP over stdio', async (t) => {
   const { dir } = setup(t);
-  const cfg = path.join(dir, 'countersign.config.json');
+  const cfg = path.join(dir, 'agent-postbox.config.json');
   fs.writeFileSync(cfg, JSON.stringify({ repository: 'example-org/example-repo', agent: 'agent-a', receiptsFile: path.join(dir, 'r.json') }));
   const cli = new URL('../src/cli.js', import.meta.url).pathname;
-  const child = spawn(process.execPath, [cli, 'serve', '--config', cfg], { env: { ...process.env, COUNTERSIGN_TOKEN: 'synthetic' } });
+  const child = spawn(process.execPath, [cli, 'serve', '--config', cfg], { env: { ...process.env, AGENT_POSTBOX_TOKEN: 'synthetic' } });
   t.after(() => child.kill());
   let out = '';
   const reply = new Promise((resolve) => child.stdout.on('data', (b) => { out += b; if (out.includes('\n')) resolve(JSON.parse(out.split('\n')[0])); }));
@@ -53,7 +53,7 @@ test('CLI: serve speaks MCP over stdio', async (t) => {
 
 test('MCP: inherited property names are rejected as input errors', async (t) => {
   const { mailbox } = setup(t);
-  const server = createServer({ name: 'countersign', version: '0', tools: tools(mailbox) });
+  const server = createServer({ name: 'agent-postbox', version: '0', tools: tools(mailbox) });
   for (const k of ['__proto__', 'constructor', 'toString']) {
     const args = JSON.parse(`{"number": 1, "${k}": {}}`);
     const r = await server.handle({ jsonrpc: '2.0', id: 1, method: 'tools/call', params: { name: 'read', arguments: args } });

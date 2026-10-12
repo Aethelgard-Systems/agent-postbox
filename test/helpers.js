@@ -13,7 +13,7 @@ import { fakeGitHub } from './fake-github.js';
 export const SYNTHETIC_TOKEN = 'synthetic-test-token-not-a-secret';
 
 export function setup(t, { agent = 'agent-a', login = 'agent-a-bot', config = {}, classicScopes } = {}) {
-  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'countersign-test-'));
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'agent-postbox-test-'));
   t.after(() => fs.rmSync(dir, { recursive: true, force: true }));
   const cfg = parseConfig({ repository: 'example-org/example-repo', agent, receiptsFile: path.join(dir, 'receipts.json'), ...config });
   const fake = fakeGitHub({ login, classicScopes });

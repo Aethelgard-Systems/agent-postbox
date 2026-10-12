@@ -1,7 +1,7 @@
 {
   "repository": "example-org/example-repo",
   "agent": "builder",
-  "tokenEnv": "COUNTERSIGN_TOKEN",
+  "tokenEnv": "AGENT_POSTBOX_TOKEN",
   "allowedLabels": ["needs-review", "blocked", "question"],
   "protectedLabels": ["approved", "decision:*"],
   "limits": {
