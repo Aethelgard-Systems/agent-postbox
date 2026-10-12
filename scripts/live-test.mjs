@@ -83,16 +83,22 @@ try {
   await check('credential in comment is refused', () => builder.mailbox.comment({ number: issue, body: 'token ghp_' + 'Zx9'.repeat(12) }), 'SECRET');
 
   // Scaffolding: builder opens a pull request with plain API calls.
-  const main = await raw(builder.token, 'GET', '/git/ref/heads/main');
-  const branch = `live-test-${run.replace(/[^0-9a-z-]/gi, '-')}`;
-  await raw(builder.token, 'POST', '/git/refs', { ref: `refs/heads/${branch}`, sha: main.object.sha });
-  await raw(builder.token, 'PUT', `/contents/live-test/${branch}.md`, { message: 'live test change', content: Buffer.from(`run ${run}\n`).toString('base64'), branch });
-  pr = (await raw(builder.token, 'POST', '/pulls', { title: `Live test PR ${run}`, head: branch, base: 'main', body: 'Synthetic pull request from the agent-postbox live test.' })).number;
+  await check('scaffolding: builder opens a PR (raw API)', async () => {
+    const main = await raw(builder.token, 'GET', '/git/ref/heads/main');
+    const branch = `live-test-${run.replace(/[^0-9a-z-]/gi, '-')}`;
+    await raw(builder.token, 'POST', '/git/refs', { ref: `refs/heads/${branch}`, sha: main.object.sha });
+    await raw(builder.token, 'PUT', `/contents/live-test/${branch}.md`, { message: 'live test change', content: Buffer.from(`run ${run}\n`).toString('base64'), branch });
+    pr = (await raw(builder.token, 'POST', '/pulls', { title: `Live test PR ${run}`, head: branch, base: 'main', body: 'Synthetic pull request from the agent-postbox live test.' })).number;
+    return { status: 'OK' };
+  }, 'OK');
+  if (!pr) throw new Error('no pull request, skipping review checks');
 
   await check('builder cannot review its own PR', () => builder.mailbox.review({ number: pr, event: 'APPROVE', body: 'Self approval attempt.' }), 'SELF_REVIEW');
   await check('reviewer requests changes (bound to head)', () => reviewer.mailbox.review({ number: pr, event: 'REQUEST_CHANGES', body: 'Criterion 2 lacks evidence.' }), 'CONFIRMED');
   await check('reviewer approves', () => reviewer.mailbox.review({ number: pr, event: 'APPROVE', body: 'Evidence provided. Approved for a human to merge.' }), 'CONFIRMED');
   await check('reviewer hands back with label', () => reviewer.mailbox.label({ number: pr, add: ['to:builder'] }), 'CONFIRMED');
+} catch (e) {
+  results.push({ ok: false, name: 'aborted', expect: '-', outcome: e.message });
 } finally {
   // Cleanup with raw API (the tool has no close endpoint by design).
   for (const n of [pr, issue].filter(Boolean)) {
