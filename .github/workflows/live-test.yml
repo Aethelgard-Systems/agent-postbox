@@ -28,17 +28,17 @@ jobs:
           app-id: ${{ secrets.BUILDER_APP_ID }}
           private-key: ${{ secrets.BUILDER_APP_KEY }}
           owner: ${{ github.repository_owner }}
-          repositories: ${{ vars.DEMO_REPO_NAME }}
+          repositories: ${{ vars.DEMO_REPO_NAME || 'agent-postbox-demo' }}
       - id: reviewer
         uses: actions/create-github-app-token@v1
         with:
           app-id: ${{ secrets.REVIEWER_APP_ID }}
           private-key: ${{ secrets.REVIEWER_APP_KEY }}
           owner: ${{ github.repository_owner }}
-          repositories: ${{ vars.DEMO_REPO_NAME }}
+          repositories: ${{ vars.DEMO_REPO_NAME || 'agent-postbox-demo' }}
       - name: Run live checks
         env:
-          DEMO_REPOSITORY: ${{ github.repository_owner }}/${{ vars.DEMO_REPO_NAME }}
+          DEMO_REPOSITORY: ${{ github.repository_owner }}/${{ vars.DEMO_REPO_NAME || 'agent-postbox-demo' }}
           BUILDER_TOKEN: ${{ steps.builder.outputs.token }}
           BUILDER_LOGIN: ${{ steps.builder.outputs.app-slug }}[bot]
           REVIEWER_TOKEN: ${{ steps.reviewer.outputs.token }}
