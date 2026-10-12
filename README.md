@@ -82,7 +82,7 @@ The complete tool list costs well under 4,000 characters of model context (teste
    ```
 6. Copy [`templates/AGENTS.md`](templates/AGENTS.md) and [`templates/pull_request_template.md`](templates/pull_request_template.md) into your repository so agents and humans share one protocol.
 
-A walk-through with two agents reviewing each other is in [`examples/two-agent-review`](examples/two-agent-review/).
+Step-by-step setup: [docs/getting-started.md](docs/getting-started.md). A walk-through with two agents reviewing each other is in [`examples/two-agent-review`](examples/two-agent-review/).
 
 ## Configuration
 
