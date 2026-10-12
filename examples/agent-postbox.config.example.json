@@ -1,0 +1,13 @@
+{
+  "repository": "example-org/example-repo",
+  "agent": "builder",
+  "tokenEnv": "AGENT_POSTBOX_TOKEN",
+  "allowedLabels": ["needs-review", "blocked", "question"],
+  "protectedLabels": ["approved", "decision:*"],
+  "limits": {
+    "writesPerDay": 50,
+    "proposalsPerDay": 5,
+    "bodyMaxChars": 6000,
+    "titleMaxChars": 120
+  }
+}

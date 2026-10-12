@@ -1,0 +1,46 @@
+name: live-test
+
+# End-to-end test against the real GitHub API with two GitHub App identities.
+# Requires repository secrets BUILDER_APP_ID, BUILDER_APP_KEY, REVIEWER_APP_ID,
+# REVIEWER_APP_KEY; optional variable DEMO_REPO_NAME (default agent-postbox-demo, a throwaway
+# repository on which both apps are installed). Never runs for forks.
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [live-test]
+
+permissions:
+  contents: read
+
+jobs:
+  live:
+    if: github.repository_owner == 'Aethelgard-Systems'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - id: builder
+        uses: actions/create-github-app-token@v1
+        with:
+          app-id: ${{ secrets.BUILDER_APP_ID }}
+          private-key: ${{ secrets.BUILDER_APP_KEY }}
+          owner: ${{ github.repository_owner }}
+          repositories: ${{ vars.DEMO_REPO_NAME || 'agent-postbox-demo' }}
+      - id: reviewer
+        uses: actions/create-github-app-token@v1
+        with:
+          app-id: ${{ secrets.REVIEWER_APP_ID }}
+          private-key: ${{ secrets.REVIEWER_APP_KEY }}
+          owner: ${{ github.repository_owner }}
+          repositories: ${{ vars.DEMO_REPO_NAME || 'agent-postbox-demo' }}
+      - name: Run live checks
+        env:
+          DEMO_REPOSITORY: ${{ github.repository_owner }}/${{ vars.DEMO_REPO_NAME || 'agent-postbox-demo' }}
+          BUILDER_TOKEN: ${{ steps.builder.outputs.token }}
+          BUILDER_LOGIN: ${{ steps.builder.outputs.app-slug }}[bot]
+          REVIEWER_TOKEN: ${{ steps.reviewer.outputs.token }}
+          REVIEWER_LOGIN: ${{ steps.reviewer.outputs.app-slug }}[bot]
+        run: node scripts/live-test.mjs
