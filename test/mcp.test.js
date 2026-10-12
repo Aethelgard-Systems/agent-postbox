@@ -50,3 +50,13 @@ test('CLI: serve speaks MCP over stdio', async (t) => {
   const res = await reply;
   assert.equal(res.result.tools.length, 6);
 });
+
+test('MCP: inherited property names are rejected as input errors', async (t) => {
+  const { mailbox } = setup(t);
+  const server = createServer({ name: 'countersign', version: '0', tools: tools(mailbox) });
+  for (const k of ['__proto__', 'constructor', 'toString']) {
+    const args = JSON.parse(`{"number": 1, "${k}": {}}`);
+    const r = await server.handle({ jsonrpc: '2.0', id: 1, method: 'tools/call', params: { name: 'read', arguments: args } });
+    assert.equal(JSON.parse(r.result.content[0].text).error, 'INPUT', k);
+  }
+});

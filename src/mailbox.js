@@ -26,21 +26,43 @@ export class Mailbox {
     this.github = github;
     this.receipts = receipts;
     this.agent = config.agent;
-    this._login = config.login || null;
+  }
+
+  /** Lists a collection page by page (bounded), so checks are not limited to the first 100 items. */
+  async #all(path, query = {}, maxPages = 10) {
+    const out = [];
+    for (let page = 1; page <= maxPages; page++) {
+      const { data } = await this.github.request('GET', path, { query: { ...query, per_page: 100, page } });
+      out.push(...data);
+      if (data.length < 100) return out;
+    }
+    return out;
+  }
+
+  #isClassicToken(headers) {
+    return headers['x-oauth-scopes'] !== undefined || /^ghp_/.test(this.github.token);
   }
 
   // ---------------------------------------------------------------- identity
 
+  /**
+   * GitHub login of the token. A configured login is cross-checked against
+   * GET /user whenever the token can answer it, so a wrong config value
+   * cannot silently weaken the four-eyes check.
+   */
   async login() {
-    if (!this._login) {
-      try {
-        const { data } = await this.github.request('GET', '/user');
-        this._login = data.login;
-      } catch (e) {
-        fail(CODES.TOKEN, 'cannot determine the token owner via GET /user; set "login" in the config (required for GitHub App tokens)', { cause: e.message });
-      }
+    if (this._loginVerified) return this._loginVerified;
+    let actual = null;
+    try {
+      actual = (await this.github.request('GET', '/user')).data?.login || null;
+    } catch (e) {
+      if (!this.config.login) fail(CODES.TOKEN, 'cannot determine the token owner via GET /user; set "login" in the config (required for GitHub App tokens)', { cause: e.message });
     }
-    return this._login;
+    if (actual && this.config.login && actual.toLowerCase() !== this.config.login.toLowerCase()) {
+      fail(CODES.TOKEN, `configured login "${this.config.login}" does not match the token owner "${actual}"`);
+    }
+    this._loginVerified = actual || this.config.login;
+    return this._loginVerified;
   }
 
   /** Checks configuration and token without writing anything. */
@@ -48,7 +70,7 @@ export class Mailbox {
     const checks = [];
     const { data: repo, headers } = await this.github.request('GET', this.github.repoUrl());
     const scopes = headers['x-oauth-scopes'];
-    if (scopes !== undefined) {
+    if (this.#isClassicToken(headers)) {
       const broad = scopes.split(',').map((s) => s.trim()).filter((s) => ['repo', 'admin:org', 'delete_repo', 'workflow', 'write:packages'].includes(s));
       if (!this.config.allowClassicToken) {
         fail(CODES.TOKEN, 'classic personal access token detected; use a fine-grained token limited to this repository (Issues + Pull requests: read/write) or set allowClassicToken', { scopes });
@@ -93,9 +115,9 @@ export class Mailbox {
 
   async read({ number }) {
     issueNumber(number);
-    const [{ data: issue }, { data: comments }] = await Promise.all([
+    const [{ data: issue }, comments] = await Promise.all([
       this.github.request('GET', this.github.repoUrl(`/issues/${number}`)),
-      this.github.request('GET', this.github.repoUrl(`/issues/${number}/comments`), { query: { per_page: 100 } }),
+      this.#all(this.github.repoUrl(`/issues/${number}/comments`), {}, 3),
     ]);
     return {
       untrusted_content: UNTRUSTED_NOTE,
@@ -118,7 +140,9 @@ export class Mailbox {
   /** Which labels this agent may add or remove. Protected labels are human-only authority. */
   checkLabel(label) {
     const { addressPrefix, claimPrefix, protectedLabels, allowedLabels, proposalLabel } = this.config;
-    if (typeof label !== 'string' || !label.trim() || label.length > 50 || /[,\n]/.test(label)) fail(CODES.INPUT, `invalid label: ${JSON.stringify(label)}`);
+    if (typeof label !== 'string' || !label.trim() || label.length > 50 || /[,\n]/.test(label) || /^\.{1,2}$/.test(label.trim())) {
+      fail(CODES.INPUT, `invalid label: ${JSON.stringify(label)}`);
+    }
     if (protectedLabels.some((p) => matchLabel(p, label))) fail(CODES.POLICY, `label "${label}" is protected: only humans may set or remove it`);
     const lower = label.toLowerCase();
     if (lower.startsWith(claimPrefix.toLowerCase())) {
@@ -141,26 +165,30 @@ export class Mailbox {
     if (kind === 'propose' && this.receipts.countToday(['propose']) >= proposalsPerDay) fail(CODES.LIMIT, `daily proposal limit reached (${proposalsPerDay})`);
   }
 
-  /**
-   * The single write path. Order matters:
-   * replay check -> unknown-outcome check -> budget -> persist ATTEMPTED
-   * -> perform -> read-back -> CONFIRMED.
-   */
   /** Classic tokens are refused before the first write, not only in doctor. */
   async #tokenGate() {
     if (this._tokenChecked) return;
     const { headers } = await this.github.request('GET', this.github.repoUrl());
-    if (headers['x-oauth-scopes'] !== undefined && !this.config.allowClassicToken) {
+    if (this.#isClassicToken(headers) && !this.config.allowClassicToken) {
       fail(CODES.TOKEN, 'classic personal access token detected; use a fine-grained token limited to this repository or set allowClassicToken');
     }
     this._tokenChecked = true;
   }
 
+  /**
+   * The single write path. Order matters:
+   * token gate -> replay/unknown-outcome check -> budget -> persist ATTEMPTED
+   * (compare-and-set) -> perform -> read-back -> CONFIRMED.
+   *
+   * Idempotent writes (labels) are never replayed from a receipt: they are
+   * performed and read back every time, because the state on GitHub may have
+   * changed since the last confirmation.
+   */
   async #write({ kind, key, target, idempotent = false, perform, readback, reconcile }) {
     await this.#tokenGate();
     const prior = this.receipts.get(key);
-    if (prior?.state === STATE.CONFIRMED) return { status: 'CONFIRMED', replay: true, receipt: key, ...prior.result };
-    if (prior && [STATE.ATTEMPTED, STATE.UNVERIFIED].includes(prior.state) && !idempotent) {
+    if (!idempotent && prior?.state === STATE.CONFIRMED) return { status: 'CONFIRMED', replay: true, receipt: key, ...prior.result };
+    if (!idempotent && prior && [STATE.ATTEMPTED, STATE.UNVERIFIED].includes(prior.state)) {
       const found = reconcile ? await reconcile() : null;
       if (found) {
         const r = this.receipts.confirm(key, found);
@@ -168,14 +196,14 @@ export class Mailbox {
       }
       fail(CODES.UNKNOWN_OUTCOME, 'a previous attempt of this exact write has an unknown outcome; check GitHub, then run "countersign receipts resolve" before retrying', { receipt: key });
     }
-    if (!prior || prior.state === STATE.FAILED) this.#budget(kind);
-    this.receipts.attempt(key, { kind, agent: this.agent, target });
+    this.#budget(kind);
+    this.receipts.attempt(key, { kind, agent: this.agent, target }, prior?.state ?? null);
     let performed;
     try {
       performed = await perform();
     } catch (e) {
       if (e instanceof GitHubError && e.definitelyNotApplied) {
-        this.receipts.markFailed(key, e.message);
+        this.receipts.markFailed(key, `GitHub ${e.status}`);
         throw e;
       }
       fail(CODES.UNKNOWN_OUTCOME, `write outcome unknown: ${e.message}`, { receipt: key });
@@ -184,7 +212,7 @@ export class Mailbox {
     try {
       verified = await readback(performed);
     } catch (e) {
-      this.receipts.markUnverified(key, e.message);
+      this.receipts.markUnverified(key, 'read-back request failed');
       fail(CODES.READBACK_MISMATCH, `write sent but read-back failed: ${e.message}`, { receipt: key });
     }
     if (!verified) {
@@ -195,6 +223,11 @@ export class Mailbox {
     return { status: 'CONFIRMED', receipt: key, ...r.result };
   }
 
+  /** Authored by this agent's own identity (forged markers from others never count). */
+  async #mine(item) {
+    return String(item?.user?.login || '').toLowerCase() === (await this.login()).toLowerCase();
+  }
+
   // ----------------------------------------------------------------- writes
 
   async comment({ number, body }) {
@@ -203,6 +236,7 @@ export class Mailbox {
     const key = receiptKey([this.config.repository, this.agent, 'comment', number, text]);
     const full = `${text}\n\n${marker(this.agent, key)}`;
     const commentsPath = this.github.repoUrl(`/issues/${number}/comments`);
+    const matches = async (c) => c && c.body === full && (await this.#mine(c));
     return this.#write({
       kind: 'comment',
       key,
@@ -210,12 +244,11 @@ export class Mailbox {
       perform: async () => (await this.github.request('POST', commentsPath, { body: { body: full } })).data,
       readback: async (c) => {
         const { data } = await this.github.request('GET', this.github.repoUrl(`/issues/comments/${c.id}`));
-        return data.body === full ? { comment_id: data.id, url: data.html_url } : null;
+        return (await matches(data)) ? { comment_id: data.id, url: data.html_url } : null;
       },
       reconcile: async () => {
-        const { data } = await this.github.request('GET', commentsPath, { query: { per_page: 100 } });
-        const c = data.find((x) => typeof x.body === 'string' && x.body.includes(marker(this.agent, key)));
-        return c ? { comment_id: c.id, url: c.html_url } : null;
+        for (const c of await this.#all(commentsPath)) if (await matches(c)) return { comment_id: c.id, url: c.html_url };
+        return null;
       },
     });
   }
@@ -238,13 +271,24 @@ export class Mailbox {
       target: { number },
       idempotent: true,
       perform: async () => {
-        if (add.length) await this.github.request('POST', labelsPath, { body: { labels: add } });
-        for (const l of remove) {
-          try {
-            await this.github.request('DELETE', `${labelsPath}/${encodeURIComponent(l)}`);
-          } catch (e) {
-            if (!(e instanceof GitHubError && e.status === 404)) throw e; // already absent is fine
+        let sent = 0;
+        try {
+          if (add.length) {
+            await this.github.request('POST', labelsPath, { body: { labels: add } });
+            sent++;
           }
+          for (const l of remove) {
+            try {
+              await this.github.request('DELETE', `${labelsPath}/${encodeURIComponent(l)}`);
+            } catch (e) {
+              if (!(e instanceof GitHubError && e.status === 404)) throw e; // already absent is fine
+            }
+            sent++;
+          }
+        } catch (e) {
+          // After a successful step a failure is a partial write, never "nothing happened".
+          if (sent > 0) throw new Error(`partial label update: ${e.message}`);
+          throw e;
         }
         return {};
       },
@@ -265,26 +309,27 @@ export class Mailbox {
     const all = [...new Set([this.config.proposalLabel, ...labels])];
     const issuesPath = this.github.repoUrl('/issues');
     const norm = (s) => s.toLowerCase().replace(/\s+/g, ' ').trim();
-    const { data: open } = await this.github.request('GET', issuesPath, { query: { state: 'open', labels: this.config.proposalLabel, per_page: 100 } });
-    const dup = open.find((i) => !i.pull_request && norm(i.title) === norm(t));
     const key = receiptKey([this.config.repository, this.agent, 'propose', t, text]);
-    if (dup && !String(dup.body || '').includes(marker(this.agent, key))) {
-      return { status: 'DUPLICATE', existing: { number: dup.number, url: dup.html_url }, note: 'an open proposal with the same title exists; comment there instead' };
-    }
     const full = `${text}\n\n---\n_Proposed by agent \`${this.agent}\` via countersign. A proposal carries no authority; a human decides._\n${marker(this.agent, key)}`;
+    const matches = async (i) => i && !i.pull_request && i.title === t && i.body === full && (await this.#mine(i));
+    const prior = this.receipts.get(key);
+    if (!prior || prior.state === STATE.FAILED) {
+      const open = await this.#all(issuesPath, { state: 'open', labels: this.config.proposalLabel });
+      const dup = open.find((i) => !i.pull_request && norm(i.title) === norm(t));
+      if (dup) return { status: 'DUPLICATE', existing: { number: dup.number, url: dup.html_url }, note: 'an open proposal with the same title exists; comment there instead' };
+    }
     return this.#write({
       kind: 'propose',
       key,
-      target: { title: t },
+      target: { kind: 'issue' },
       perform: async () => (await this.github.request('POST', issuesPath, { body: { title: t, body: full, labels: all } })).data,
       readback: async (issue) => {
         const { data } = await this.github.request('GET', this.github.repoUrl(`/issues/${issue.number}`));
-        return data.title === t && data.body === full ? { number: data.number, url: data.html_url } : null;
+        return (await matches(data)) ? { number: data.number, url: data.html_url } : null;
       },
       reconcile: async () => {
-        const { data } = await this.github.request('GET', issuesPath, { query: { state: 'all', labels: this.config.proposalLabel, per_page: 100 } });
-        const i = data.find((x) => String(x.body || '').includes(marker(this.agent, key)));
-        return i ? { number: i.number, url: i.html_url } : null;
+        for (const i of await this.#all(issuesPath, { state: 'all', labels: this.config.proposalLabel })) if (await matches(i)) return { number: i.number, url: i.html_url };
+        return null;
       },
     });
   }
@@ -301,10 +346,12 @@ export class Mailbox {
       fail(CODES.SELF_REVIEW, `four-eyes rule: ${me} opened this pull request and cannot review it`);
     }
     const sha = pr.head?.sha;
+    if (typeof sha !== 'string' || !/^[0-9a-f]{40,64}$/.test(sha)) fail(CODES.GITHUB, 'pull request head commit is missing');
     const key = receiptKey([this.config.repository, this.agent, 'review', number, sha, event, text]);
     const full = `${text}\n\n${marker(this.agent, key)}`;
     const reviewsPath = this.github.repoUrl(`/pulls/${number}/reviews`);
     const expected = REVIEW_STATE[event];
+    const matches = async (rv) => rv && rv.state === expected && rv.body === full && rv.commit_id === sha && (await this.#mine(rv));
     return this.#write({
       kind: 'review',
       key,
@@ -312,13 +359,11 @@ export class Mailbox {
       perform: async () => (await this.github.request('POST', reviewsPath, { body: { commit_id: sha, event, body: full } })).data,
       readback: async (rv) => {
         const { data } = await this.github.request('GET', `${reviewsPath}/${rv.id}`);
-        const ok = data.state === expected && data.body === full && data.commit_id === sha && String(data.user?.login || '').toLowerCase() === me;
-        return ok ? { review_id: data.id, state: data.state, commit: sha, url: data.html_url } : null;
+        return (await matches(data)) ? { review_id: data.id, state: data.state, commit: sha, url: data.html_url } : null;
       },
       reconcile: async () => {
-        const { data } = await this.github.request('GET', reviewsPath, { query: { per_page: 100 } });
-        const rv = data.find((x) => String(x.body || '').includes(marker(this.agent, key)));
-        return rv ? { review_id: rv.id, state: rv.state, commit: sha, url: rv.html_url } : null;
+        for (const rv of await this.#all(reviewsPath)) if (await matches(rv)) return { review_id: rv.id, state: rv.state, commit: sha, url: rv.html_url };
+        return null;
       },
     });
   }

@@ -45,7 +45,7 @@ function labelList(value, field) {
 export function parseConfig(raw) {
   if (!raw || typeof raw !== 'object' || Array.isArray(raw)) fail(CODES.CONFIG, 'config must be a JSON object');
   for (const k of Object.keys(raw)) if (!KEYS.has(k)) fail(CODES.CONFIG, `unknown config key: ${k}`);
-  if (typeof raw.repository !== 'string' || !REPO_RE.test(raw.repository)) fail(CODES.CONFIG, 'repository must look like "owner/repo"');
+  if (typeof raw.repository !== 'string' || !REPO_RE.test(raw.repository) || raw.repository.split('/').some((x) => /^\.+$/.test(x))) fail(CODES.CONFIG, 'repository must look like "owner/repo"');
   if (typeof raw.agent !== 'string' || !AGENT_RE.test(raw.agent)) fail(CODES.CONFIG, 'agent must be lowercase letters, digits or dashes (max 39)');
   if (raw.login !== undefined && (typeof raw.login !== 'string' || !/^[A-Za-z0-9-]+(\[bot\])?$/.test(raw.login))) fail(CODES.CONFIG, 'login must be a GitHub login');
   if (raw.tokenEnv !== undefined && (typeof raw.tokenEnv !== 'string' || !/^[A-Z_][A-Z0-9_]*$/.test(raw.tokenEnv))) fail(CODES.CONFIG, 'tokenEnv must be an environment variable name');

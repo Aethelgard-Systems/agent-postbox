@@ -61,8 +61,9 @@ export class GitHub {
   }
 
   async request(method, path, { query, body } = {}) {
-    if (!this.#allowed(method, path)) fail(CODES.POLICY, `endpoint not allowed: ${method} ${path}`);
     const url = new URL(this.baseUrl + path);
+    // Check what will actually be sent: URL normalisation (dot segments) must not change the path.
+    if (url.pathname !== path || !this.#allowed(method, url.pathname)) fail(CODES.POLICY, `endpoint not allowed: ${method} ${path}`);
     for (const [k, v] of Object.entries(query || {})) if (v !== undefined) url.searchParams.set(k, String(v));
     let res;
     try {

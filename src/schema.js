@@ -19,7 +19,7 @@ export function validate(schema, value, at = 'arguments') {
       const props = schema.properties || {};
       for (const r of schema.required || []) if (value[r] === undefined) fail(CODES.INPUT, `${at}.${r} is required`);
       for (const [k, v] of Object.entries(value)) {
-        if (!props[k]) {
+        if (!Object.hasOwn(props, k)) {
           if (schema.additionalProperties === false) fail(CODES.INPUT, `${at}.${k} is not allowed`);
           continue;
         }

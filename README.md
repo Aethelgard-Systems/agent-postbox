@@ -21,8 +21,8 @@ Multi-agent setups usually fail in boring ways: an agent claims it posted someth
 | Problem | What countersign does |
 |---|---|
 | "I posted it" – but nothing is there | **Read-back**: every write is fetched again and compared before it counts as done |
-| Timeout → retry → duplicate | **Write receipts**: `ATTEMPTED` is stored before sending, `CONFIRMED` after read-back. Unknown outcomes are reconciled via a hidden marker or blocked until a human resolves them |
-| Agent approves its own PR | **Four-eyes**: reviews are refused when the PR author is the same GitHub identity; reviews are bound to the head commit |
+| Timeout → retry → duplicate | **Write receipts**: `ATTEMPTED` is stored before sending, `CONFIRMED` after read-back. An unknown outcome is reconciled only if GitHub shows the exact write by the agent's own identity; otherwise it stays blocked until a human resolves it |
+| Agent approves its own PR | **Four-eyes**: any review (including comments) is refused when the PR author is the token's own identity, which is verified against GitHub; reviews are bound to the head commit |
 | Agent decides things it should only propose | **Authority separation**: protected labels (e.g. `approved`, `decision:*`) are human-only; proposals carry an explicit no-authority footer |
 | Agent can do anything the token can | **Bounded writes**: a fixed endpoint allowlist – no merge, close, delete, body edit, settings or code access |
 | Token or password ends up in a comment | **Secret filter** on every title and body (best effort, see Security) |
@@ -112,6 +112,13 @@ countersign serve
 
 All output is JSON. Refusals exit with code 2 and a stable error code (`POLICY`, `SECRET`, `LIMIT`, `SELF_REVIEW`, `UNKNOWN_OUTCOME`, `READBACK_MISMATCH`, …).
 
+## Known limits (v0.1)
+
+- An identical comment text on the same issue is posted only once (replay protection); add context to make a new comment distinct.
+- Duplicate-title checks and reconciliation scan up to 1,000 items.
+- Adding a `to:<agent>` label creates that label in the repository if it does not exist yet.
+- Reviews and comments are not edited or deleted by countersign – by design.
+
 ## Security model
 
 countersign is designed to **reduce** the risk of common multi-agent failures. It is not a sandbox.
@@ -120,7 +127,9 @@ countersign is designed to **reduce** the risk of common multi-agent failures. I
 - **Four-eyes depends on separate identities.** If two agents share a token, GitHub sees one author and the four-eyes check cannot help.
 - **The secret filter is best effort.** It catches common token formats and high-entropy strings; it will miss some secrets and occasionally flag harmless text.
 - **Untrusted content stays untrusted.** countersign labels everything it reads as data. Whether your agent respects that depends on your agent.
-- **Receipts are a local hint, GitHub is the truth.** The receipt file is written atomically with mode `0600`; it contains issue numbers and digests, not message bodies or tokens.
+- **Receipts are a local hint, GitHub is the truth.** The receipt file is written atomically with mode `0600` under a lock file, so the MCP server and the CLI can share it. It contains keys, states, issue numbers, links and HTTP status codes – no message bodies, titles or tokens.
+- **Markers are invisible, not secret.** Each write carries an HTML comment marker. It is only trusted when GitHub shows it on content authored by the agent's own identity with the exact expected text.
+- **Limits are local.** Daily limits count the writes in this agent's receipt file on this machine; they are a brake, not a quota enforced by GitHub.
 - **No telemetry, no hosted service.** countersign talks only to `api.github.com` with the token you provide.
 
 Please report vulnerabilities as described in [SECURITY.md](SECURITY.md).

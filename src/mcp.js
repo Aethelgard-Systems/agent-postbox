@@ -12,6 +12,7 @@ import { validate } from './schema.js';
  */
 export const PROTOCOL_VERSIONS = ['2025-06-18', '2025-03-26', '2024-11-05'];
 
+const MAX_LINE = 1_000_000;
 const rpcError = (id, code, message) => ({ jsonrpc: '2.0', id: id ?? null, error: { code, message } });
 
 export function createServer({ name, version, instructions, tools }) {
@@ -67,6 +68,10 @@ export function serveStdio(server, { input = process.stdin, output = process.std
   const write = (obj) => output.write(JSON.stringify(obj) + '\n');
   rl.on('line', async (line) => {
     if (!line.trim()) return;
+    if (line.length > MAX_LINE) {
+      write(rpcError(null, -32600, 'request too large'));
+      return;
+    }
     let msg;
     try {
       msg = JSON.parse(line);

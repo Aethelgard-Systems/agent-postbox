@@ -16,8 +16,13 @@ import { CODES, fail } from './errors.js';
  * States: ATTEMPTED -> CONFIRMED | FAILED | UNVERIFIED
  *
  * The file is a local hint, not the source of truth: GitHub is. It is written
- * atomically (tmp + rename) with mode 0600. One process per receipts file.
+ * atomically (tmp + rename) with mode 0600 under an exclusive lock file, so
+ * the MCP server and the CLI can share it. It stores keys, states, issue
+ * numbers and HTTP status codes - never message bodies, titles or tokens.
  */
+const LOCK_WAIT_MS = 5000;
+const LOCK_STALE_MS = 30000;
+const sleep = (ms) => Atomics.wait(new Int32Array(new SharedArrayBuffer(4)), 0, 0, ms);
 export const STATE = Object.freeze({
   ATTEMPTED: 'ATTEMPTED',
   CONFIRMED: 'CONFIRMED',
@@ -54,7 +59,6 @@ export class ReceiptStore {
 
   #save(data) {
     try {
-      fs.mkdirSync(path.dirname(this.file), { recursive: true, mode: 0o700 });
       const tmp = `${this.file}.${process.pid}.tmp`;
       fs.writeFileSync(tmp, JSON.stringify(data, null, 2) + '\n', { mode: 0o600 });
       fs.renameSync(tmp, this.file);
@@ -71,16 +75,50 @@ export class ReceiptStore {
     return Object.entries(this.#load().receipts).map(([key, r]) => ({ key, ...r }));
   }
 
-  #update(key, patch) {
-    const data = this.#load();
-    const current = data.receipts[key] || {};
-    data.receipts[key] = { ...current, ...patch, updatedAt: this.now().toISOString() };
-    this.#save(data);
-    return { key, ...data.receipts[key] };
+  #locked(fn) {
+    const lock = `${this.file}.lock`;
+    try {
+      fs.mkdirSync(path.dirname(this.file), { recursive: true, mode: 0o700 });
+    } catch (e) {
+      fail(CODES.RECEIPTS, `cannot create receipts directory; nothing was written to GitHub (${e.code || e.message})`);
+    }
+    const deadline = Date.now() + LOCK_WAIT_MS;
+    for (;;) {
+      try {
+        fs.closeSync(fs.openSync(lock, 'wx', 0o600));
+        break;
+      } catch (e) {
+        if (e.code !== 'EEXIST') fail(CODES.RECEIPTS, `cannot lock receipts file; nothing was written to GitHub (${e.code || e.message})`);
+        try {
+          if (Date.now() - fs.statSync(lock).mtimeMs > LOCK_STALE_MS) fs.rmSync(lock, { force: true });
+        } catch { /* lock vanished meanwhile */ }
+        if (Date.now() > deadline) fail(CODES.RECEIPTS, `receipts file is locked by another process (${lock})`);
+        sleep(25);
+      }
+    }
+    try {
+      return fn();
+    } finally {
+      fs.rmSync(lock, { force: true });
+    }
   }
 
-  attempt(key, meta) {
-    return this.#update(key, { ...meta, state: STATE.ATTEMPTED, attemptedAt: this.now().toISOString() });
+  #update(key, patch, expectedState) {
+    return this.#locked(() => {
+      const data = this.#load();
+      const current = data.receipts[key] || null;
+      if (expectedState !== undefined && (current?.state ?? null) !== expectedState) {
+        fail(CODES.UNKNOWN_OUTCOME, 'another process is writing the same item; check GitHub before retrying', { receipt: key });
+      }
+      data.receipts[key] = { ...(current || {}), ...patch, updatedAt: this.now().toISOString() };
+      this.#save(data);
+      return { key, ...data.receipts[key] };
+    });
+  }
+
+  /** Compare-and-set: only succeeds if the receipt is still in the state the caller saw. */
+  attempt(key, meta, expectedState) {
+    return this.#update(key, { ...meta, state: STATE.ATTEMPTED, attemptedAt: this.now().toISOString() }, expectedState);
   }
 
   confirm(key, result) {
