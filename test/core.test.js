@@ -53,3 +53,11 @@ test('package has no runtime dependencies', () => {
   assert.deepEqual(pkg.dependencies || {}, {});
   assert.equal(pkg.license, 'Apache-2.0');
 });
+
+test('GitHub Enterprise base path is supported without opening the allowlist', async () => {
+  const seen = [];
+  const github = new GitHub({ owner: 'o', repo: 'r', token: 't', baseUrl: 'https://ghe.example.com/api/v3', fetch: async (u) => { seen.push(u); return { ok: true, status: 200, text: async () => '{"login":"x"}', headers: new Map() }; } });
+  await github.request('GET', '/user');
+  assert.equal(seen[0], 'https://ghe.example.com/api/v3/user');
+  await assert.rejects(github.request('GET', '/repos/o/r/contents/x'), { code: 'POLICY' });
+});

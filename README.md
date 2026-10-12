@@ -118,6 +118,7 @@ All output is JSON. Refusals exit with code 2 and a stable error code (`POLICY`,
 - Duplicate-title checks and reconciliation scan up to 1,000 items.
 - Adding a `to:<agent>` label creates that label in the repository if it does not exist yet.
 - Reviews and comments are not edited or deleted by countersign – by design.
+- When the MCP server and the CLI share a receipt file, a lock conflict can pause the server for up to 5 seconds, and concurrent processes may exceed a daily limit by a few writes.
 
 ## Security model
 

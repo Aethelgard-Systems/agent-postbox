@@ -48,6 +48,7 @@ export class GitHub {
     this.repo = repo;
     this.repoPath = `/repos/${owner}/${repo}`;
     this.baseUrl = baseUrl.replace(/\/$/, '');
+    this.basePath = new URL(this.baseUrl).pathname.replace(/\/$/, ''); // e.g. /api/v3 on GitHub Enterprise Server
     this.fetch = fetchImpl;
     this.userAgent = userAgent;
     Object.defineProperty(this, 'token', { value: token, enumerable: false });
@@ -63,7 +64,7 @@ export class GitHub {
   async request(method, path, { query, body } = {}) {
     const url = new URL(this.baseUrl + path);
     // Check what will actually be sent: URL normalisation (dot segments) must not change the path.
-    if (url.pathname !== path || !this.#allowed(method, url.pathname)) fail(CODES.POLICY, `endpoint not allowed: ${method} ${path}`);
+    if (url.pathname !== this.basePath + path || !this.#allowed(method, path)) fail(CODES.POLICY, `endpoint not allowed: ${method} ${path}`);
     for (const [k, v] of Object.entries(query || {})) if (v !== undefined) url.searchParams.set(k, String(v));
     let res;
     try {

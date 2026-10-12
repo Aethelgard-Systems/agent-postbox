@@ -56,7 +56,9 @@ export class Mailbox {
     try {
       actual = (await this.github.request('GET', '/user')).data?.login || null;
     } catch (e) {
-      if (!this.config.login) fail(CODES.TOKEN, 'cannot determine the token owner via GET /user; set "login" in the config (required for GitHub App tokens)', { cause: e.message });
+      // Only an authoritative "this token cannot answer /user" (app tokens) falls back to config.
+      const authoritative = e instanceof GitHubError && [401, 403, 404].includes(e.status);
+      if (!this.config.login || !authoritative) fail(CODES.TOKEN, 'cannot determine the token owner via GET /user; set "login" in the config (required for GitHub App tokens)', { cause: e.message });
     }
     if (actual && this.config.login && actual.toLowerCase() !== this.config.login.toLowerCase()) {
       fail(CODES.TOKEN, `configured login "${this.config.login}" does not match the token owner "${actual}"`);
@@ -71,11 +73,11 @@ export class Mailbox {
     const { data: repo, headers } = await this.github.request('GET', this.github.repoUrl());
     const scopes = headers['x-oauth-scopes'];
     if (this.#isClassicToken(headers)) {
-      const broad = scopes.split(',').map((s) => s.trim()).filter((s) => ['repo', 'admin:org', 'delete_repo', 'workflow', 'write:packages'].includes(s));
+      const broad = (scopes ?? '').split(',').map((s) => s.trim()).filter((s) => ['repo', 'admin:org', 'delete_repo', 'workflow', 'write:packages'].includes(s));
       if (!this.config.allowClassicToken) {
         fail(CODES.TOKEN, 'classic personal access token detected; use a fine-grained token limited to this repository (Issues + Pull requests: read/write) or set allowClassicToken', { scopes });
       }
-      checks.push({ check: 'token-type', status: 'WARN', detail: `classic token with scopes: ${scopes || '(none)'}${broad.length ? ` - broad: ${broad.join(', ')}` : ''}` });
+      checks.push({ check: 'token-type', status: 'WARN', detail: `classic token with scopes: ${scopes || '(unknown)'}${broad.length ? ` - broad: ${broad.join(', ')}` : ''}` });
     } else {
       checks.push({ check: 'token-type', status: 'OK', detail: 'fine-grained or app token (no classic scopes header)' });
     }

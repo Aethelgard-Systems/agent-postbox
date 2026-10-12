@@ -213,3 +213,18 @@ test('review fix: receipts never store titles or bodies', async (t) => {
   const raw = fs.readFileSync(config.receiptsFile, 'utf8');
   assert.ok(!raw.includes('secretive') && !raw.includes('Synthetic body'));
 });
+
+test('review fix: doctor reports TOKEN (not a crash) for ghp_ tokens without scope header', async (t) => {
+  const { config, fake, receipts } = setup(t);
+  const { GitHub } = await import('../src/github.js');
+  const { Mailbox } = await import('../src/mailbox.js');
+  const github = new GitHub({ owner: config.owner, repo: config.repo, token: 'ghp_' + 'x'.repeat(36), fetch: fake.fetch });
+  await assert.rejects(new Mailbox({ config, github, receipts }).doctor(), { code: 'TOKEN' });
+});
+
+test('review fix: a transient /user failure does not silently trust the configured login', async (t) => {
+  const { mailbox, gh } = setup(t, { config: { login: 'agent-a-bot' } });
+  gh.failNext = { method: 'GET', path: '/user', network: true };
+  await assert.rejects(mailbox.login(), { code: 'TOKEN' });
+  assert.equal(await mailbox.login(), 'agent-a-bot');
+});
