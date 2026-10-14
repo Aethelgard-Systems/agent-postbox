@@ -41,6 +41,8 @@ cd agent-postbox
 npm run demo
 ```
 
+Windows PowerShell blocks `npm` with “running scripts is disabled on this system”? Use `npm.cmd run demo` or `node examples/offline-demo/demo.mjs` instead – same demo, no policy change needed.
+
 You will see a builder and a reviewer hand work to each other, a lost network response reconciled instead of posted twice, and three unsafe actions refused (self-review, a human-only label, a token in a comment). Details and limits: [`examples/offline-demo`](examples/offline-demo/).
 
 ## Non-goals
