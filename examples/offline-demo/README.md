@@ -4,6 +4,8 @@
 npm run demo
 ```
 
+For screen recordings: `npm run demo:slow` pauses between steps.
+
 Requires Node.js ≥ 20, nothing else: no install, no GitHub account, no token, no network.
 
 ## What it shows
