@@ -29,6 +29,18 @@ Multi-agent setups usually fail in boring ways: an agent claims it posted someth
 | Issue text tries to instruct the agent | All read content is marked as **untrusted data** |
 | Runaway agent | **Daily limits** for writes and proposals |
 
+## Try it in 30 seconds
+
+No GitHub account, token or network needed – the demo runs two agents against an in-memory GitHub with synthetic data:
+
+```sh
+git clone https://github.com/Aethelgard-Systems/agent-postbox.git
+cd agent-postbox
+npm run demo
+```
+
+You will see a builder and a reviewer hand work to each other, a lost network response reconciled instead of posted twice, and three unsafe actions refused (self-review, a human-only label, a token in a comment). Details and limits: [`examples/offline-demo`](examples/offline-demo/).
+
 ## Non-goals
 
 Not an agent framework, not a runtime, no database, no dashboard, no worktree orchestration, no role model. Bring your own agents; agent-postbox is only the mailbox.

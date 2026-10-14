@@ -5,7 +5,7 @@
  * In-memory stand-in for the GitHub REST API, covering only the endpoints
  * agent-postbox may call. Synthetic data only.
  */
-export function fakeGitHub({ owner = 'example-org', repo = 'example-repo', login = 'agent-a-bot', classicScopes } = {}) {
+export function fakeGitHub({ owner = 'example-org', repo = 'example-repo', login: defaultLogin = 'agent-a-bot', classicScopes } = {}) {
   const base = `/repos/${owner}/${repo}`;
   const state = {
     calls: [],
@@ -30,7 +30,8 @@ export function fakeGitHub({ owner = 'example-org', repo = 'example-repo', login
     return state.issues.get(number);
   };
 
-  async function fetch(url, opts = {}) {
+  // Several agents (different logins) can share one in-memory repository.
+  async function fetchAs(login, url, opts = {}) {
     const u = new URL(url);
     const method = opts.method || 'GET';
     const path = u.pathname;
@@ -114,5 +115,7 @@ export function fakeGitHub({ owner = 'example-org', repo = 'example-repo', login
     return json(404, { message: `fake: no route for ${method} ${path}` });
   }
 
-  return { fetch, state };
+  const fetch = (url, opts) => fetchAs(defaultLogin, url, opts);
+  const fetchFor = (other) => (url, opts) => fetchAs(other, url, opts);
+  return { fetch, fetchFor, state };
 }
