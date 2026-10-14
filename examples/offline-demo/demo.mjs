@@ -32,8 +32,14 @@ function agent(name, login) {
 const builder = agent('builder', 'builder-bot');
 const reviewer = agent('reviewer', 'reviewer-bot');
 
+// --slow pauses between steps, e.g. for screen recordings.
+const pause = process.argv.includes('--slow') ? 1400 : 0;
+const wait = () => new Promise((resolve) => setTimeout(resolve, pause));
 let step = 0;
-const say = (who, text) => console.log(`\n${String(++step).padStart(2)}. ${who.padEnd(8)} ${text}`);
+const say = async (who, text) => {
+  if (step) await wait();
+  console.log(`\n${String(++step).padStart(2)}. ${who.padEnd(8)} ${text}`);
+};
 const ok = (text) => console.log(`    ✔ ${text}`);
 const refused = (text) => console.log(`    ✖ ${text}`);
 async function expectRefusal(promise, code, label = 'refused') {
@@ -50,50 +56,50 @@ async function expectRefusal(promise, code, label = 'refused') {
 try {
   console.log('agent-postbox offline demo – in-memory GitHub, synthetic data, nothing leaves this machine.');
 
-  say('human', 'opens issue #1 "Add a CONTRIBUTORS file" for the builder');
+  await say('human', 'opens issue #1 "Add a CONTRIBUTORS file" for the builder');
   gh.addIssue(1, { title: 'Add a CONTRIBUTORS file', labels: [{ name: 'to:builder' }] });
 
-  say('builder', 'checks its inbox and claims the issue');
+  await say('builder', 'checks its inbox and claims the issue');
   const inbox = await builder.inbox();
   ok(`inbox: ${inbox.items.map((i) => `#${i.number} ${i.title}`).join(', ')}`);
   await builder.label({ number: 1, add: ['claimed:builder'] });
   ok('label claimed:builder set and read back');
 
-  say('builder', 'opens PR #2 with its own git tooling and hands it to the reviewer');
+  await say('builder', 'opens PR #2 with its own git tooling and hands it to the reviewer');
   gh.addIssue(2, { title: 'Add CONTRIBUTORS', user: { login: 'builder-bot' }, pull: { sha: 'a'.repeat(40) } });
   await builder.label({ number: 2, add: ['to:reviewer', 'needs-review'] });
   ok('PR #2 addressed to:reviewer');
 
-  say('reviewer', 'reviews PR #2 and requests changes');
+  await say('reviewer', 'reviews PR #2 and requests changes');
   const r1 = await reviewer.review({ number: 2, event: 'REQUEST_CHANGES', body: 'Acceptance criterion 2 has no evidence yet.' });
   ok(`${r1.status}: changes requested, bound to head commit ${'a'.repeat(7)}`);
 
-  say('builder', 'pushes a fix and reports evidence – but the network drops right after the write');
+  await say('builder', 'pushes a fix and reports evidence – but the network drops right after the write');
   gh.issues.get(2).pull.sha = 'b'.repeat(40);
   gh.dropNextWrite = true;
   const evidence = 'DONE – evidence: tests 12/12 passed, CONTRIBUTORS lists 3 names.';
   await expectRefusal(builder.comment({ number: 2, body: evidence }), 'UNKNOWN_OUTCOME', 'stopped');
   console.log('    … the agent does not know whether its comment arrived. A naive retry would post it twice.');
 
-  say('builder', 'retries the same comment');
+  await say('builder', 'retries the same comment');
   const c = await builder.comment({ number: 2, body: evidence });
   ok(`${c.status}${c.reconciled ? ' (reconciled: found its own write on GitHub instead of posting again)' : ''}`);
   ok(`comments on PR #2: ${[...gh.comments.values()].filter((x) => x.issue === 2).length} – no duplicate`);
 
-  say('reviewer', 'approves the new head commit');
+  await say('reviewer', 'approves the new head commit');
   const r2 = await reviewer.review({ number: 2, event: 'APPROVE', body: 'Evidence checked, criteria met.' });
   ok(`${r2.status}: approved at ${'b'.repeat(7)}`);
 
-  say('builder', 'tries to approve its own pull request');
+  await say('builder', 'tries to approve its own pull request');
   await expectRefusal(builder.review({ number: 2, event: 'APPROVE', body: 'Looks good to me.' }), 'SELF_REVIEW');
 
-  say('builder', 'tries to set the human-only label "approved"');
+  await say('builder', 'tries to set the human-only label "approved"');
   await expectRefusal(builder.label({ number: 2, add: ['approved'] }), 'POLICY');
 
-  say('builder', 'tries to paste a token into a comment');
+  await say('builder', 'tries to paste a token into a comment');
   await expectRefusal(builder.comment({ number: 2, body: `debug: ${'ghp_' + 'A1b2C3d4E5f6G7h8I9j0K1l2M3n4O5p6Q7r8'}` }), 'SECRET');
 
-  say('human', 'merges PR #2 – agents have no merge endpoint');
+  await say('human', 'merges PR #2 – agents have no merge endpoint');
 
   const receipts = [...builder.receipts.list(), ...reviewer.receipts.list()];
   const confirmed = receipts.filter((r) => r.state === 'CONFIRMED').length;

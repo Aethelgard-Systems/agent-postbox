@@ -23,7 +23,8 @@
   },
   "scripts": {
     "test": "node --test test/*.test.js",
-    "demo": "node examples/offline-demo/demo.mjs"
+    "demo": "node examples/offline-demo/demo.mjs",
+    "demo:slow": "node examples/offline-demo/demo.mjs --slow"
   },
   "keywords": [
     "mcp",
