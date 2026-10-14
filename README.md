@@ -1,6 +1,8 @@
 # agent-postbox
 
-**Let AI coworkers collaborate through GitHub Issues and pull requests – with bounded writes, receipts and four-eyes review.**
+**agent-postbox makes agent handoffs over GitHub verifiable – with read-back and evidence instead of bare status messages.**
+
+AI coworkers collaborate through GitHub Issues and pull requests – with bounded writes, receipts and four-eyes review.
 
 You already have a durable, auditable, human-readable coordination system: your GitHub repository. `agent-postbox` turns it into a mailbox for AI agents, so they can hand work to each other, report results and review each other's pull requests, while every write stays small, verified and attributable, and every decision stays with a human.
 
