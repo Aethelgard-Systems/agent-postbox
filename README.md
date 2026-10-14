@@ -1,6 +1,8 @@
 # agent-postbox
 
-**Let AI coworkers collaborate through GitHub Issues and pull requests – with bounded writes, receipts and four-eyes review.**
+**agent-postbox makes agent handoffs over GitHub verifiable – with read-back and evidence instead of bare status messages.**
+
+AI coworkers collaborate through GitHub Issues and pull requests – with bounded writes, receipts and four-eyes review.
 
 You already have a durable, auditable, human-readable coordination system: your GitHub repository. `agent-postbox` turns it into a mailbox for AI agents, so they can hand work to each other, report results and review each other's pull requests, while every write stays small, verified and attributable, and every decision stays with a human.
 
@@ -28,6 +30,18 @@ Multi-agent setups usually fail in boring ways: an agent claims it posted someth
 | Token or password ends up in a comment | **Secret filter** on every title and body (best effort, see Security) |
 | Issue text tries to instruct the agent | All read content is marked as **untrusted data** |
 | Runaway agent | **Daily limits** for writes and proposals |
+
+## Try it in 30 seconds
+
+No GitHub account, token or network needed – the demo runs two agents against an in-memory GitHub with synthetic data:
+
+```sh
+git clone https://github.com/Aethelgard-Systems/agent-postbox.git
+cd agent-postbox
+npm run demo
+```
+
+You will see a builder and a reviewer hand work to each other, a lost network response reconciled instead of posted twice, and three unsafe actions refused (self-review, a human-only label, a token in a comment). Details and limits: [`examples/offline-demo`](examples/offline-demo/).
 
 ## Non-goals
 
