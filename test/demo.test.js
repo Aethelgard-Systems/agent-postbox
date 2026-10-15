@@ -11,3 +11,10 @@ test('offline demo runs end to end and shows every guarantee', () => {
     assert.ok(out.includes(expected), `missing in demo output: ${expected}`);
   }
 });
+
+test('offline handoff demo runs end to end (v0.2)', () => {
+  const out = execFileSync(process.execPath, ['examples/offline-demo/handoff-demo.mjs'], { encoding: 'utf8' });
+  for (const expected of ['refused: POLICY', 'stopped: READBACK_MISMATCH', 'acknowledged=true, result=DONE', 'planner: OK', 'builder: OK', 'TAMPERED – line 2']) {
+    assert.ok(out.includes(expected), `missing in demo output: ${expected}`);
+  }
+});

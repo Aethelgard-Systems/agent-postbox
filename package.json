@@ -1,7 +1,7 @@
 {
   "name": "agent-postbox",
-  "version": "0.1.0",
-  "description": "Let AI coworkers collaborate through GitHub Issues and PRs with bounded writes, receipts and four-eyes review.",
+  "version": "0.2.0",
+  "description": "Verifiable handoffs for MCP agents: AI coworkers collaborate through GitHub Issues and PRs with bounded writes, receipts, read-back and a signed evidence log.",
   "license": "Apache-2.0",
   "author": "Marco Gernand",
   "type": "module",
@@ -16,7 +16,8 @@
     "templates/",
     "LICENSE",
     "NOTICE",
-    "README.md"
+    "README.md",
+    "docs/evidence-format.md"
   ],
   "engines": {
     "node": ">=20"
@@ -24,7 +25,8 @@
   "scripts": {
     "test": "node --test test/*.test.js",
     "demo": "node examples/offline-demo/demo.mjs",
-    "demo:slow": "node examples/offline-demo/demo.mjs --slow"
+    "demo:slow": "node examples/offline-demo/demo.mjs --slow",
+    "demo:handoff": "node examples/offline-demo/handoff-demo.mjs"
   },
   "keywords": [
     "mcp",
@@ -32,7 +34,10 @@
     "ai-agents",
     "github-issues",
     "multi-agent",
-    "code-review"
+    "code-review",
+    "handoff",
+    "audit-log",
+    "evidence"
   ],
   "dependencies": {}
 }
