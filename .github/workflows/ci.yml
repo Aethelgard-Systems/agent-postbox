@@ -30,4 +30,4 @@ jobs:
         with:
           fetch-depth: 0
       - name: gitleaks (full history)
-        run: docker run --rm -v "$PWD:/repo" ghcr.io/gitleaks/gitleaks:v8.18.4 detect --source /repo --redact --verbose
+        run: docker run --rm -v "$PWD:/repo" ghcr.io/gitleaks/gitleaks:v8.18.4 detect --source /repo --config /repo/.gitleaks.toml --redact --verbose

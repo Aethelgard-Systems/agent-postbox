@@ -145,7 +145,7 @@ export async function main(argv = process.argv.slice(2)) {
         if (!config.evidenceFile) throw new PostboxError('CONFIG', 'evidence log is disabled');
         if (!fs.existsSync(config.evidenceKeyFile)) generateKey(config.evidenceKeyFile);
         const pub = loadPublicKey(`${config.evidenceKeyFile}.pub`);
-        const where = config.evidenceKeyFile;
+        const { evidenceKeyFile: where } = config;
         out = { public_key_pem: pub.export({ type: 'spki', format: 'pem' }), key_file: where };
       } else throw new PostboxError('INPUT', 'use "evidence verify" or "evidence key"');
       break;

@@ -1,0 +1,11 @@
+# gitleaks: default rules plus an allowlist for identifier-only matches in this code base
+# (configuration property names and environment-variable names are not secrets).
+title = "agent-postbox"
+
+[extend]
+useDefault = true
+
+[allowlist]
+description = "identifier-only matches (config keys, env var names); no secret values"
+regexTarget = "match"
+regexes = ['''evidenceKeyFile''', '''AGENT_POSTBOX_HTTP_TOKEN''', '''synthetic-http-token''']
