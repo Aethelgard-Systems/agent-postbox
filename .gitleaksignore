@@ -1,0 +1,7 @@
+# gitleaks false positives in this branch's history: synthetic identifiers / env-variable names, not secrets.
+# Format: <commit>:<file>:<rule>:<line>
+8d1ce1e69283c446ba58a7baa4caaae490464787:src/cli.js:generic-api-key:107
+8d1ce1e69283c446ba58a7baa4caaae490464787:src/cli.js:generic-api-key:146
+8d1ce1e69283c446ba58a7baa4caaae490464787:src/config.js:generic-api-key:88
+27cda26fda70f1b91e3a2750ab2b916ffd6d5814:src/cli.js:generic-api-key:147
+27cda26fda70f1b91e3a2750ab2b916ffd6d5814:src/config.js:generic-api-key:88

@@ -85,8 +85,8 @@ export function parseConfig(raw) {
   // v0.2: evidence log (hash chain + Ed25519) next to the receipts; "evidence": false disables it.
   const base = config.receiptsFile.replace(/\.json$/, '');
   config.evidenceFile = raw.evidence === false ? null : (raw.evidenceFile ?? `${base}.evidence.jsonl`);
-  const keyFile = raw.evidenceKeyFile;
-  config.evidenceKeyFile = keyFile ?? `${base}.evidence-key.pem`;
+  const { evidenceKeyFile: chosen } = raw;
+  config.evidenceKeyFile = chosen ?? `${base}.evidence-key.pem`;
   config.handoffLabel = raw.handoffLabel ?? 'handoff';
   return Object.freeze(config);
 }
