@@ -104,7 +104,8 @@ export async function main(argv = process.argv.slice(2)) {
     if ((v.transport || 'stdio') === 'http') {
       const port = Number(v.port || 8471);
       if (!Number.isInteger(port) || port < 1 || port > 65535) throw new PostboxError('INPUT', '--port must be 1-65535');
-      const srv = await serveHttp(server, { host: v.host || '127.0.0.1', port, token: process.env.AGENT_POSTBOX_HTTP_TOKEN || null });
+      const bearer = process.env.AGENT_POSTBOX_HTTP_TOKEN || null; // non-loopback binds require it
+      const srv = await serveHttp(server, { host: v.host || '127.0.0.1', port, token: bearer });
       process.stderr.write(`agent-postbox: MCP (Streamable HTTP, stateless) on http://${v.host || '127.0.0.1'}:${port}/mcp\n`);
       await new Promise((resolve) => srv.on('close', resolve));
       return;
@@ -143,7 +144,8 @@ export async function main(argv = process.argv.slice(2)) {
       } else if (rest[0] === 'key') {
         if (!config.evidenceFile) throw new PostboxError('CONFIG', 'evidence log is disabled');
         if (!fs.existsSync(config.evidenceKeyFile)) generateKey(config.evidenceKeyFile);
-        out = { public_key_pem: loadPublicKey(`${config.evidenceKeyFile}.pub`).export({ type: 'spki', format: 'pem' }), key_file: config.evidenceKeyFile };
+        const pub = loadPublicKey(`${config.evidenceKeyFile}.pub`);
+        out = { public_key_pem: pub.export({ type: 'spki', format: 'pem' }), key_file: config.evidenceKeyFile };
       } else throw new PostboxError('INPUT', 'use "evidence verify" or "evidence key"');
       break;
     case 'receipts':
