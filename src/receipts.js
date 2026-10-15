@@ -35,9 +35,11 @@ export function receiptKey(parts) {
 }
 
 export class ReceiptStore {
-  constructor(file, { now = () => new Date() } = {}) {
+  /** `evidence` (optional, v0.2): an EvidenceLog; every state change is appended there as a signed, chained entry. */
+  constructor(file, { now = () => new Date(), evidence = null } = {}) {
     this.file = file;
     this.now = now;
+    this.evidence = evidence;
   }
 
   #load() {
@@ -112,8 +114,33 @@ export class ReceiptStore {
       }
       data.receipts[key] = { ...(current || {}), ...patch, updatedAt: this.now().toISOString() };
       this.#save(data);
-      return { key, ...data.receipts[key] };
+      const r = { key, ...data.receipts[key] };
+      this.#evidence(r, patch);
+      return r;
     });
+  }
+
+  /** Evidence entry per state change (best effort: a failing evidence write never blocks the receipt, but is reported on stderr). */
+  #evidence(r, patch) {
+    if (!this.evidence) return;
+    try {
+      const target = r.target || {};
+      const summary = [r.kind, target.number ? `#${target.number}` : '', target.event || '', target.to ? `to:${target.to}` : ''].filter(Boolean).join(' ');
+      this.evidence.append({
+        event: patch.resolvedManually ? 'RESOLVED' : r.state,
+        call_id: r.key,
+        tool: r.kind || '',
+        args_sha256: r.argsSha256 || '',
+        summary,
+        decision: r.state,
+        by: patch.resolvedManually ? 'human' : (r.agent || ''),
+        result_sha256: r.result ? crypto.createHash('sha256').update(JSON.stringify(r.result)).digest('hex') : '',
+        readback: r.state === STATE.CONFIRMED ? 'ok' : r.state === STATE.UNVERIFIED ? 'unclear' : '',
+        note: r.reason || '',
+      });
+    } catch (e) {
+      process.stderr.write(`agent-postbox: evidence log not written: ${e.message}\n`);
+    }
   }
 
   /** Compare-and-set: only succeeds if the receipt is still in the state the caller saw. */

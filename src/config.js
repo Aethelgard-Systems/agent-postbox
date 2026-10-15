@@ -23,7 +23,7 @@ const DEFAULTS = Object.freeze({
 
 const KEYS = new Set([
   '$schema', 'repository', 'agent', 'login', 'tokenEnv', 'addressPrefix', 'claimPrefix',
-  'proposalLabel', 'protectedLabels', 'allowedLabels', 'limits', 'receiptsFile', 'allowClassicToken',
+  'proposalLabel', 'protectedLabels', 'allowedLabels', 'limits', 'receiptsFile', 'allowClassicToken', 'evidence', 'evidenceFile', 'evidenceKeyFile', 'handoffLabel',
 ]);
 const LIMIT_KEYS = new Set(Object.keys(DEFAULTS.limits));
 
@@ -53,6 +53,8 @@ export function parseConfig(raw) {
     if (raw[k] !== undefined && (typeof raw[k] !== 'string' || !LABEL_RE.test(raw[k]))) fail(CODES.CONFIG, `${k} must be a label string`);
   }
   if (raw.allowClassicToken !== undefined && typeof raw.allowClassicToken !== 'boolean') fail(CODES.CONFIG, 'allowClassicToken must be boolean');
+  if (raw.evidence !== undefined && typeof raw.evidence !== 'boolean') fail(CODES.CONFIG, 'evidence must be boolean');
+  if (raw.handoffLabel !== undefined && (typeof raw.handoffLabel !== 'string' || !LABEL_RE.test(raw.handoffLabel))) fail(CODES.CONFIG, 'handoffLabel must be a label string');
   const limits = { ...DEFAULTS.limits };
   if (raw.limits !== undefined) {
     if (!raw.limits || typeof raw.limits !== 'object') fail(CODES.CONFIG, 'limits must be an object');
@@ -80,6 +82,12 @@ export function parseConfig(raw) {
   }
   config.receiptsFile = raw.receiptsFile ??
     path.join(stateDir(), 'agent-postbox', `${owner}-${repo}-${config.agent}.json`.toLowerCase());
+  // v0.2: evidence log (hash chain + Ed25519) next to the receipts; "evidence": false disables it.
+  const base = config.receiptsFile.replace(/\.json$/, '');
+  config.evidenceFile = raw.evidence === false ? null : (raw.evidenceFile ?? `${base}.evidence.jsonl`);
+  const { evidenceKeyFile: chosen } = raw;
+  config.evidenceKeyFile = chosen ?? `${base}.evidence-key.pem`;
+  config.handoffLabel = raw.handoffLabel ?? 'handoff';
   return Object.freeze(config);
 }
 

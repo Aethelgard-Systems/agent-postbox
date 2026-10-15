@@ -18,7 +18,7 @@ test('MCP: initialize, list tools, call tool, structured errors', async (t) => {
   assert.equal(init.result.protocolVersion, '2025-03-26');
   assert.equal(await server.handle({ jsonrpc: '2.0', method: 'notifications/initialized' }), null);
   const list = await server.handle({ jsonrpc: '2.0', id: 2, method: 'tools/list' });
-  assert.deepEqual(list.result.tools.map((x) => x.name), ['inbox', 'read', 'comment', 'label', 'propose', 'review']);
+  assert.deepEqual(list.result.tools.map((x) => x.name), ['inbox', 'read', 'comment', 'label', 'propose', 'review', 'handoff_create', 'handoff_read', 'handoff_ack']);
   const call = await server.handle({ jsonrpc: '2.0', id: 3, method: 'tools/call', params: { name: 'inbox', arguments: {} } });
   assert.equal(call.result.isError, undefined);
   assert.equal(call.result.structuredContent.items[0].number, 3);
@@ -34,7 +34,7 @@ test('MCP: initialize, list tools, call tool, structured errors', async (t) => {
 test('MCP: tool descriptions stay small (context budget)', (t) => {
   const { mailbox } = setup(t);
   const size = JSON.stringify(tools(mailbox).map(({ name, description, inputSchema }) => ({ name, description, inputSchema }))).length;
-  assert.ok(size < 4000, `tool definitions are ${size} chars`);
+  assert.ok(size < 4500, `tool definitions are ${size} chars`);
 });
 
 test('CLI: serve speaks MCP over stdio', async (t) => {
@@ -48,7 +48,7 @@ test('CLI: serve speaks MCP over stdio', async (t) => {
   const reply = new Promise((resolve) => child.stdout.on('data', (b) => { out += b; if (out.includes('\n')) resolve(JSON.parse(out.split('\n')[0])); }));
   child.stdin.write(JSON.stringify({ jsonrpc: '2.0', id: 1, method: 'tools/list' }) + '\n');
   const res = await reply;
-  assert.equal(res.result.tools.length, 6);
+  assert.equal(res.result.tools.length, 9);
 });
 
 test('MCP: inherited property names are rejected as input errors', async (t) => {
