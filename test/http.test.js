@@ -3,9 +3,20 @@
 
 import assert from 'node:assert/strict';
 import test from 'node:test';
+import http from 'node:http';
 import { createServer, serveHttp } from '../src/mcp.js';
 import { tools } from '../src/tools.js';
 import { setup } from './helpers.js';
+
+/** Raw request with an arbitrary Host header (fetch forbids overriding Host). */
+function raw(port, headers, body) {
+  return new Promise((resolve, reject) => {
+    const req = http.request({ host: '127.0.0.1', port, path: '/mcp', method: 'POST', headers: { 'content-type': 'application/json', ...headers } }, (res) => {
+      res.resume(); res.on('end', () => resolve(res.statusCode));
+    });
+    req.on('error', reject); req.end(body);
+  });
+}
 
 async function rpc(url, body, headers = {}) {
   const res = await fetch(url, { method: 'POST', headers: { 'content-type': 'application/json', ...headers }, body: JSON.stringify(body) });
@@ -27,7 +38,30 @@ test('HTTP: stateless Streamable HTTP speaks JSON-RPC, refuses GET, batches and 
   assert.equal((await rpc(url, [{ jsonrpc: '2.0', id: 3, method: 'ping' }])).status, 400);
   assert.equal((await fetch(url)).status, 405);
   assert.equal((await fetch(`http://127.0.0.1:${srv.address().port}/other`)).status, 404);
-  assert.equal((await fetch(url, { method: 'POST', body: '{not json' })).status, 400);
+  assert.equal((await fetch(url, { method: 'POST', headers: { 'content-type': 'application/json' }, body: '{not json' })).status, 400);
+});
+
+test('HTTP: browser hardening – JSON content type required, foreign Host and Origin refused (review #6 P1)', async (t) => {
+  const { mailbox } = setup(t);
+  const server = createServer({ name: 'agent-postbox', version: '0', tools: tools(mailbox) });
+  const srv = await serveHttp(server, { host: '127.0.0.1', port: 0, origins: ['http://allowed.example'] });
+  t.after(() => srv.close());
+  const port = srv.address().port;
+  const url = `http://127.0.0.1:${port}/mcp`;
+  const ping = JSON.stringify({ jsonrpc: '2.0', id: 1, method: 'ping' });
+  // a cross-site "simple request" (text/plain, no preflight) never reaches the JSON-RPC layer
+  assert.equal((await fetch(url, { method: 'POST', body: ping })).status, 415);
+  assert.equal((await fetch(url, { method: 'POST', headers: { 'content-type': 'text/plain' }, body: ping })).status, 415);
+  // DNS rebinding: Host names someone else
+  assert.equal(await raw(port, { host: `evil.example:${port}` }, ping), 403);
+  assert.equal(await raw(port, { host: 'evil.example' }, ping), 403);
+  assert.equal(await raw(port, { host: `localhost:${port}` }, ping), 200);
+  assert.equal(await raw(port, { host: `[::1]:${port}` }, ping), 200);
+  // a browser announces itself with Origin; only allowlisted origins pass
+  assert.equal((await fetch(url, { method: 'POST', headers: { 'content-type': 'application/json', origin: 'http://evil.example' }, body: ping })).status, 403);
+  assert.equal((await fetch(url, { method: 'POST', headers: { 'content-type': 'application/json', origin: 'http://allowed.example' }, body: ping })).status, 200);
+  // no CORS preflight handler: OPTIONS is refused, so the browser never sends the real request
+  assert.equal((await fetch(url, { method: 'OPTIONS', headers: { host: `127.0.0.1:${port}` } })).status, 405);
 });
 
 test('HTTP: bearer token required when configured; non-loopback bind refused without token', async (t) => {

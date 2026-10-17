@@ -96,8 +96,22 @@ const MAX_BODY = 1_000_000;
  * `Authorization: Bearer <token>`; without a token the server refuses to bind
  * to anything but loopback. GET/DELETE on /mcp answer 405 (no SSE streams).
  */
-export function serveHttp(server, { host = '127.0.0.1', port = 8471, path = '/mcp', token = null, listen = true } = {}) {
+export function serveHttp(server, { host = '127.0.0.1', port = 8471, path = '/mcp', token = null, listen = true, origins = [] } = {}) {
   if (!token && !['127.0.0.1', 'localhost', '::1'].includes(host)) throw new Error('refusing to bind a non-loopback address without AGENT_POSTBOX_HTTP_TOKEN');
+  // Browser hardening (review #6 P1): a web page must not be able to drive this endpoint.
+  // 1) JSON content type is required – a cross-site "simple request" (text/plain, no preflight) is refused with 415.
+  // 2) The Host header must name this server (loopback or the configured host) – defeats DNS rebinding.
+  // 3) Requests that carry an Origin header come from a browser; they are refused unless the origin is allowlisted.
+  const hostOk = (req, actualPort) => {
+    const h = String(req.headers.host || '').toLowerCase();
+    const names = new Set(['127.0.0.1', 'localhost', '[::1]', host.includes(':') ? `[${host}]` : host]);
+    return [...names].some((n) => h === n || h === `${n}:${actualPort}`);
+  };
+  const originOk = (req) => {
+    const o = req.headers.origin;
+    if (o === undefined) return true;
+    return origins.includes(String(o).toLowerCase());
+  };
   const authorized = (req) => {
     if (!token) return true;
     const h = req.headers.authorization || '';
@@ -111,11 +125,16 @@ export function serveHttp(server, { host = '127.0.0.1', port = 8471, path = '/mc
   };
   const srv = http.createServer((req, res) => {
     if (new URL(req.url, 'http://x').pathname !== path) return send(res, 404, { error: 'not found' });
+    const actualPort = srv.address() ? srv.address().port : port;
+    if (!hostOk(req, actualPort)) return send(res, 403, { error: 'forbidden: Host header does not name this server' });
+    if (!originOk(req)) return send(res, 403, { error: 'forbidden: browser origin not allowed' });
     if (!authorized(req)) {
       res.setHeader('www-authenticate', 'Bearer');
       return send(res, 401, { error: 'unauthorized' });
     }
     if (req.method !== 'POST') return send(res, 405, { error: 'POST only (stateless JSON, no SSE)' });
+    const ctype = String(req.headers['content-type'] || '').split(';')[0].trim().toLowerCase();
+    if (ctype !== 'application/json') return send(res, 415, { error: 'Content-Type: application/json required' });
     let size = 0;
     const chunks = [];
     req.on('data', (c) => {

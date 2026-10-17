@@ -10,7 +10,9 @@ All notable changes to agent-postbox. The format follows Keep a Changelog; versi
   is bound to that hash and refused if the handoff changed since it was read (`READBACK_MISMATCH`). `DONE` requires
   evidence. The acknowledgement comment is receipted and read back like every write. CLI: `handoff create|read|ack`.
 - **Streamable HTTP transport** (stateless JSON, `POST /mcp`): `agent-postbox serve --transport http [--host] [--port]`.
-  Loopback by default; other hosts require `AGENT_POSTBOX_HTTP_TOKEN` (Bearer).
+  Loopback by default; other hosts require `AGENT_POSTBOX_HTTP_TOKEN` (Bearer). Browser hardening: `Content-Type:
+  application/json` is required (415 otherwise), the `Host` header must name the server (403 – defeats DNS rebinding),
+  requests carrying an `Origin` header are refused unless allowlisted (`AGENT_POSTBOX_HTTP_ORIGINS`, comma-separated), no CORS preflight.
 - **Evidence log** (`<receipts>.evidence.jsonl`): every receipt state change as a hash-chained, Ed25519-signed entry
   in the shared *evidence-v1* format (`docs/evidence-format.md`). `agent-postbox evidence verify` detects modified,
   removed, reordered, inserted, forged and truncated entries; `evidence key` prints the public key.
@@ -22,6 +24,11 @@ All notable changes to agent-postbox. The format follows Keep a Changelog; versi
 - `tools/list` now returns nine tools; the original six come first and are unchanged. The tool definitions grew from
   under 4,000 to under 4,500 characters.
 - Daily write budget counts handoffs and acknowledgements as writes.
+
+### Behaviour changes
+- The evidence log is **on by default**: after upgrading, the first write creates `<receipts>.evidence.jsonl` and an
+  Ed25519 key `<receipts>.evidence-key.pem` (0600) next to the receipts file. Set `"evidence": false` to opt out.
+- `ts` in evidence entries is integer milliseconds; the `.head` sidecar is a signed `{hash, seq, sig}` object.
 
 ### Compatibility
 - v0.1 configuration and receipt files load unchanged (`test/compat.test.js`). No runtime dependencies.

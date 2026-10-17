@@ -72,23 +72,31 @@ export class EvidenceLog {
   append({ event, call_id = '', tool = '', args_sha256 = '', summary = '', decision = '', by = '', result_sha256 = '', readback = '', note = '' }) {
     const key = this.#ensureKey();
     const entry = {
-      seq: this.seq + 1, ts: Math.round(this.now() * 1000) / 1000, event, call_id, tool, args_sha256,
+      seq: this.seq + 1, ts: Math.round(this.now() * 1000), event, call_id, tool, args_sha256,
       summary: String(summary).slice(0, 500), decision, by, result_sha256, readback, note: String(note).slice(0, 500), prev: this.prev,
     };
     entry.hash = sha256(canonical(entry));
     entry.sig = crypto.sign(null, Buffer.from(entry.hash, 'hex'), key).toString('hex');
     fs.mkdirSync(path.dirname(this.file), { recursive: true, mode: 0o700 });
     fs.appendFileSync(this.file, canonical(entry) + '\n', { mode: 0o600 });
-    fs.writeFileSync(`${this.file}.head`, entry.hash);
+    fs.writeFileSync(`${this.file}.head`, canonical(signedHead(entry.seq, entry.hash, key)));
     this.seq = entry.seq;
     this.prev = entry.hash;
     return entry;
   }
 }
 
-/** Returns { ok, problems: [{line, reason}], entries }. Any edited, removed, reordered, inserted or truncated line is reported. */
+/** The head sidecar: `{seq, hash, sig}` with `sig` = Ed25519 over `head:<seq>:<hash>`, so a rewritten head is detectable. */
+export const headMessage = (seq, hash) => Buffer.from(`head:${seq}:${hash}`, 'utf8');
+export function signedHead(seq, hash, key) {
+  return { seq, hash, sig: crypto.sign(null, headMessage(seq, hash), key).toString('hex') };
+}
+
+/** Returns { ok, problems: [{line, reason}], warnings: [string], entries }. Any edited, removed, reordered, inserted or
+ *  truncated line is reported; a missing head sidecar is a warning (truncation at the very end cannot be ruled out then). */
 export function verify(file, publicKey) {
   const problems = [];
+  const warnings = [];
   if (!fs.existsSync(file)) return { ok: false, problems: [{ line: 0, reason: 'log file missing' }], entries: 0 };
   let prev = GENESIS;
   let seq = 0;
@@ -110,6 +118,7 @@ export function verify(file, publicKey) {
     if (keys !== [...FIELDS, 'hash', 'sig'].sort().join(',')) {
       problems.push({ line: ln, reason: 'unexpected fields' });
       prev = e.hash ?? prev;
+      seq += 1; // keep counting so the next line is not blamed for a sequence gap as well
       return;
     }
     const body = Object.fromEntries(FIELDS.map((k) => [k, e[k]]));
@@ -121,15 +130,25 @@ export function verify(file, publicKey) {
     if (!sigOk) problems.push({ line: ln, reason: 'signature invalid' });
     if (e.prev !== prev) problems.push({ line: ln, reason: 'chain broken (entry removed, reordered or inserted before this line)' });
     if (e.seq !== seq + 1) problems.push({ line: ln, reason: `sequence gap: expected ${seq + 1}, got ${e.seq}` });
+    if (!Number.isInteger(e.ts)) problems.push({ line: ln, reason: 'ts must be integer milliseconds' });
     prev = e.hash;
     seq = Number.isInteger(e.seq) ? e.seq : seq + 1;
     lastHash = e.hash;
   });
   const head = `${file}.head`;
-  if (fs.existsSync(head) && fs.readFileSync(head, 'utf8').trim() !== (lastHash || GENESIS)) {
-    problems.push({ line: entries, reason: 'head mismatch (entries truncated at the end or head stale)' });
+  if (!fs.existsSync(head)) {
+    warnings.push('head sidecar missing: truncation at the end of the log cannot be ruled out');
+  } else {
+    let h = null;
+    try { h = JSON.parse(fs.readFileSync(head, 'utf8')); } catch { /* legacy or damaged */ }
+    let headSigOk = false;
+    if (h && Number.isInteger(h.seq) && typeof h.hash === 'string' && typeof h.sig === 'string') {
+      try { headSigOk = crypto.verify(null, headMessage(h.seq, h.hash), publicKey, Buffer.from(h.sig, 'hex')); } catch { /* malformed */ }
+    }
+    if (!headSigOk) problems.push({ line: entries, reason: 'head sidecar unsigned, damaged or forged' });
+    else if (h.hash !== (lastHash || GENESIS) || h.seq !== seq) problems.push({ line: entries, reason: 'head mismatch (entries truncated at the end or head stale)' });
   }
-  return { ok: problems.length === 0, problems, entries };
+  return { ok: problems.length === 0, problems, warnings, entries };
 }
 
 export function evidenceVerifyFromConfig(config) {

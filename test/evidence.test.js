@@ -30,7 +30,12 @@ test('evidence: chain + signatures verify; modified, removed, reordered, forged,
   const log = new EvidenceLog(file, key, { now: () => (now += 1) });
   for (let i = 1; i <= 4; i++) log.append({ event: i % 2 ? 'ATTEMPTED' : 'CONFIRMED', call_id: `k${Math.ceil(i / 2)}`, tool: 'comment', by: 'agent-a', readback: i % 2 ? '' : 'ok' });
   const pub = loadPublicKey(`${key}.pub`);
-  assert.deepEqual(verify(file, pub), { ok: true, problems: [], entries: 4 });
+  assert.deepEqual(verify(file, pub), { ok: true, problems: [], warnings: [], entries: 4 });
+  // ts is integer milliseconds – an integral second (1800000001.0) must not become "1800000001.0" vs "1800000001" across languages
+  for (const l of fs.readFileSync(file, 'utf8').trim().split('\n')) assert.ok(Number.isInteger(JSON.parse(l).ts) && /"ts":\d+[,}]/.test(l));
+  // head sidecar is signed: rewriting it to the truncated tail is caught, deleting it is a warning
+  const headFile = `${file}.head`;
+  assert.deepEqual(Object.keys(JSON.parse(fs.readFileSync(headFile, 'utf8'))).sort(), ['hash', 'seq', 'sig']);
   assert.equal(fs.statSync(key).mode & 0o777, 0o600);
   // restart continues the chain
   const again = new EvidenceLog(file, key, { now: () => (now += 1) });
@@ -50,6 +55,13 @@ test('evidence: chain + signatures verify; modified, removed, reordered, forged,
   assert.ok(verify(file, pub).problems.some((p) => /signature/.test(p.reason)));
   write(lines.slice(0, 3));
   assert.ok(verify(file, pub).problems.some((p) => /truncated/.test(p.reason)));
+  const savedHead = fs.readFileSync(headFile, 'utf8');
+  fs.writeFileSync(headFile, JSON.stringify({ seq: 3, hash: JSON.parse(lines[2]).hash, sig: '00'.repeat(64) }));
+  assert.ok(verify(file, pub).problems.some((p) => /forged/.test(p.reason)));
+  fs.rmSync(headFile);
+  const r = verify(file, pub);
+  assert.equal(r.ok, true); assert.match(r.warnings[0], /head sidecar missing/);
+  fs.writeFileSync(headFile, savedHead);
   write(lines);
   assert.equal(verify(file, pub).ok, true);
   assert.equal(verify(path.join(dir, 'missing.jsonl'), pub).ok, false);

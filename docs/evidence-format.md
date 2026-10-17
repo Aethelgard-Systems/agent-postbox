@@ -13,7 +13,7 @@ One JSON object per line. Keys, all required (empty string when not applicable):
 | Field | Type | Meaning |
 |---|---|---|
 | `seq` | integer | 1, 2, 3 … without gaps |
-| `ts` | number | Unix time in seconds, ≤ 3 decimals |
+| `ts` | integer | Unix time in **milliseconds** (integer – never a float, so every JSON serializer writes the same bytes) |
 | `event` | string | What happened: in agent-postbox the receipt state (`ATTEMPTED`, `CONFIRMED`, `FAILED`, `UNVERIFIED`, `RESOLVED`); a gate uses `preview`, `decision`, `result`, `readback`, `allow` |
 | `call_id` | string | Correlates entries of one action (receipt key, call id) |
 | `tool` | string | The tool or write kind (`comment`, `handoff-ack`, `ueberweisung` …) |
@@ -28,12 +28,15 @@ One JSON object per line. Keys, all required (empty string when not applicable):
 | `hash` | string | SHA-256 (hex) over the canonical JSON of the thirteen fields above |
 | `sig` | string | Ed25519 signature (hex) over the raw 32 bytes of `hash` |
 
-A sidecar file `<log>.head` contains the latest `hash`, so truncation at the end is detectable while the sidecar is intact.
+A sidecar file `<log>.head` holds `{"hash":…,"seq":…,"sig":…}` (canonical JSON): the latest `hash` and `seq`, signed with the same
+key over the UTF-8 bytes of `head:<seq>:<hash>`. Truncation at the end is detected while the sidecar is present; a rewritten or
+deleted sidecar is reported (forged → failure, missing → warning), because without it the tail cannot be vouched for.
 
 ## Canonical JSON
 
 For hashing, serialize the thirteen fields with **keys sorted**, **no whitespace**, non-ASCII characters kept as-is
-(UTF-8), integers without decimal point, floats in shortest round-trip form. This is Python's
+(UTF-8), integers without decimal point. No field may be a non-integer number (`ts` is integer milliseconds for exactly this
+reason: `1760000000.0` and `1760000000` would hash differently across languages). This is Python's
 `json.dumps(obj, sort_keys=True, separators=(",", ":"), ensure_ascii=False)` and the `canonical()` function in `src/evidence.js`.
 The line as written to the file is the canonical JSON of the full entry (fifteen keys, sorted).
 
@@ -41,8 +44,10 @@ The line as written to the file is the canonical JSON of the full entry (fifteen
 
 For each line in order: (1) all fifteen keys present and no others; (2) `hash` equals SHA-256 of the canonical
 thirteen fields; (3) `sig` verifies against the public key; (4) `prev` equals the previous entry's `hash` (genesis for the
-first); (5) `seq` increments by one. Finally the head sidecar, if present, must equal the last `hash`. A verifier
-reports every failing line with its number; any of **modified, removed, reordered, inserted, forged or truncated** is detected.
+first); (5) `seq` increments by one; (6) `ts` is an integer. Finally the head sidecar: its signature must verify and its `hash`/`seq`
+must equal the last entry; a missing sidecar is a warning. A verifier reports every failing line with its number; any of
+**modified, removed, reordered, inserted or forged** line is detected, and **truncation** at the end as long as the signed
+sidecar is present – an attacker who can delete the sidecar leaves a warning, not a clean verdict.
 
 ```sh
 agent-postbox evidence verify      # this agent's log

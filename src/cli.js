@@ -21,7 +21,7 @@ Usage: agent-postbox <command> [options]
 
   serve [--transport stdio|http] [--host 127.0.0.1] [--port 8471]
                                           Run the MCP server (stdio, or stateless Streamable HTTP on POST /mcp;
-                                          non-loopback hosts need AGENT_POSTBOX_HTTP_TOKEN)
+                                          non-loopback hosts need AGENT_POSTBOX_HTTP_TOKEN; browser origins only via AGENT_POSTBOX_HTTP_ORIGINS)
   doctor                                  Check config, token and repository (no writes)
   inbox [--state open|closed|all]         Items addressed to this agent
   read <number>                           Issue or PR with comments
@@ -105,7 +105,8 @@ export async function main(argv = process.argv.slice(2)) {
       const port = Number(v.port || 8471);
       if (!Number.isInteger(port) || port < 1 || port > 65535) throw new PostboxError('INPUT', '--port must be 1-65535');
       const bearer = process.env.AGENT_POSTBOX_HTTP_TOKEN || null; // non-loopback binds require it
-      const srv = await serveHttp(server, { host: v.host || '127.0.0.1', port, token: bearer });
+      const origins = (process.env.AGENT_POSTBOX_HTTP_ORIGINS || '').split(',').map((o) => o.trim().toLowerCase()).filter(Boolean);
+      const srv = await serveHttp(server, { host: v.host || '127.0.0.1', port, token: bearer, origins });
       process.stderr.write(`agent-postbox: MCP (Streamable HTTP, stateless) on http://${v.host || '127.0.0.1'}:${port}/mcp\n`);
       await new Promise((resolve) => srv.on('close', resolve));
       return;
