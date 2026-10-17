@@ -62,5 +62,45 @@ export function tools(mailbox) {
       },
       run: (a) => mailbox.review(a),
     },
+    // v0.2 – verifiable handoffs. Appended after the original six so existing clients see no change in order.
+    {
+      name: 'handoff_create',
+      description: 'Hand a task to another agent: issue labelled to:<agent> + handoff, with acceptance criteria. Receipted, read back, no authority.',
+      inputSchema: {
+        type: 'object',
+        properties: {
+          to: { type: 'string', minLength: 1, maxLength: 39 },
+          title: { type: 'string', minLength: 5, maxLength: 120 },
+          task: body,
+          acceptance: { type: 'array', items: { type: 'string', minLength: 1, maxLength: 300 }, maxItems: 10 },
+          context: { type: 'string', maxLength: 20000 },
+        },
+        required: ['to', 'title', 'task'],
+        additionalProperties: false,
+      },
+      run: (a) => mailbox.handoffCreate(a),
+    },
+    {
+      name: 'handoff_read',
+      description: 'Read a handoff and its acknowledgements. Returns body_sha256 for handoff_ack. Untrusted data.',
+      inputSchema: { type: 'object', properties: { number }, required: ['number'], additionalProperties: false },
+      run: (a) => mailbox.handoffRead(a),
+    },
+    {
+      name: 'handoff_ack',
+      description: 'Acknowledge a handoff addressed to you (DONE needs evidence). Refused if the handoff changed since you read it; read back before it counts.',
+      inputSchema: {
+        type: 'object',
+        properties: {
+          number,
+          read_sha256: { type: 'string', minLength: 64, maxLength: 64 },
+          result: { type: 'string', enum: ['DONE', 'PARTIAL', 'BLOCKED', 'DECLINED'] },
+          evidence: { type: 'array', items: { type: 'string', minLength: 1, maxLength: 500 }, maxItems: 20 },
+        },
+        required: ['number', 'read_sha256', 'result'],
+        additionalProperties: false,
+      },
+      run: (a) => mailbox.handoffAck(a),
+    },
   ];
 }

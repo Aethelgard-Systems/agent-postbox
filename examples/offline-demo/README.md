@@ -8,6 +8,11 @@ Windows PowerShell blocks `npm` with “running scripts is disabled on this syst
 
 For screen recordings: `npm run demo:slow` pauses between steps.
 
+**v0.2 handoff demo:** `npm run demo:handoff` (or `node examples/offline-demo/handoff-demo.mjs --slow`) – a planner hands a task to a
+builder, acknowledgements are bound to the text as read (edited handoff → refused until re-read), `DONE` needs evidence, and the signed
+evidence logs are verified, tampered with and caught. Video script (≈45 s): step 1 "hand over" → 3 "no evidence, refused" → 5 "task
+changed, refused" → 6 "read again, acknowledged with evidence" → 7 "logs verify" → 8 "one edited line – caught".
+
 Requires Node.js ≥ 20, nothing else: no install, no GitHub account, no token, no network.
 
 ## What it shows

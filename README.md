@@ -1,12 +1,12 @@
 # agent-postbox
 
-**agent-postbox makes agent handoffs over GitHub verifiable – with read-back and evidence instead of bare status messages.**
+**Verifiable handoffs for MCP agents. agent-postbox makes agent handoffs over GitHub verifiable – with read-back and evidence instead of bare status messages.**
 
 AI coworkers collaborate through GitHub Issues and pull requests – with bounded writes, receipts and four-eyes review.
 
 You already have a durable, auditable, human-readable coordination system: your GitHub repository. `agent-postbox` turns it into a mailbox for AI agents, so they can hand work to each other, report results and review each other's pull requests, while every write stays small, verified and attributable, and every decision stays with a human.
 
-It is a small [Model Context Protocol](https://modelcontextprotocol.io) server plus a CLI. Zero runtime dependencies.
+It is a small [Model Context Protocol](https://modelcontextprotocol.io) server (stdio or Streamable HTTP) plus a CLI. Zero runtime dependencies.
 
 ```text
 human ──opens issue──▶  #12  [to:builder]
@@ -30,6 +30,8 @@ Multi-agent setups usually fail in boring ways: an agent claims it posted someth
 | Token or password ends up in a comment | **Secret filter** on every title and body (best effort, see Security) |
 | Issue text tries to instruct the agent | All read content is marked as **untrusted data** |
 | Runaway agent | **Daily limits** for writes and proposals |
+| "Done" – but done *what*, against which version of the task? | **Handoffs** (v0.2): a task issue with acceptance criteria; the acknowledgement is bound to the hash of the text the agent read and needs evidence |
+| Logs can be edited after the fact | **Evidence log** (v0.2): every receipt state change is hash-chained and Ed25519-signed; `evidence verify` catches edits, gaps and truncation |
 
 ## Try it in 30 seconds
 
@@ -45,6 +47,8 @@ Windows PowerShell blocks `npm` with “running scripts is disabled on this syst
 
 You will see a builder and a reviewer hand work to each other, a lost network response reconciled instead of posted twice, and three unsafe actions refused (self-review, a human-only label, a token in a comment). Details and limits: [`examples/offline-demo`](examples/offline-demo/).
 
+`npm run demo:handoff` shows the v0.2 flow: a planner hands a task to a builder, the builder's acknowledgement is bound to the text it read (an edited handoff is refused until re-read), and the signed evidence log is verified – then tampered with and caught.
+
 ## Non-goals
 
 Not an agent framework, not a runtime, no database, no dashboard, no worktree orchestration, no role model. Bring your own agents; agent-postbox is only the mailbox.
@@ -59,8 +63,11 @@ Not an agent framework, not a runtime, no database, no dashboard, no worktree or
 | `label` | Add/remove labels: `to:<any-agent>` (hand off), `claimed:<self>`, labels from `allowedLabels` |
 | `propose` | New issue labelled `proposal`, duplicate check, daily limit |
 | `review` | PR review (`APPROVE`, `REQUEST_CHANGES`, `COMMENT`) bound to the head commit; refused on own PRs |
+| `handoff_create` | Hand a task to another agent: issue labelled `to:<agent>` + `handoff`, with acceptance criteria (v0.2) |
+| `handoff_read` | Read a handoff and its acknowledgements; returns `body_sha256` (v0.2) |
+| `handoff_ack` | Acknowledge a handoff addressed to you (`DONE` needs evidence); refused if the text changed since you read it; read back before it counts (v0.2) |
 
-The complete tool list costs well under 4,000 characters of model context (tested).
+The complete tool list costs under 4,500 characters of model context (tested).
 
 ## Quick start
 
@@ -84,7 +91,7 @@ The complete tool list costs well under 4,000 characters of model context (teste
    ```sh
    AGENT_POSTBOX_TOKEN=... agent-postbox doctor
    ```
-5. **Connect your MCP client** (example for clients using the common `mcpServers` format):
+5. **Connect your MCP client** (example for clients using the common `mcpServers` format). For clients that speak Streamable HTTP, run `agent-postbox serve --transport http --port 8471` instead and point them at `http://127.0.0.1:8471/mcp` (other hosts need `AGENT_POSTBOX_HTTP_TOKEN`):
    ```json
    {
      "mcpServers": {
@@ -116,25 +123,40 @@ Step-by-step setup: [docs/getting-started.md](docs/getting-started.md). A walk-t
 | `limits` | 50 writes, 5 proposals per day, 6000-char body, 120-char title | Per agent |
 | `receiptsFile` | `$XDG_STATE_HOME/agent-postbox/<owner>-<repo>-<agent>.json` | Local receipt store |
 | `allowClassicToken` | `false` | Accept classic PATs (not recommended) |
+| `evidence` | `true` | Write the signed evidence log (v0.2); `false` disables it |
+| `evidenceFile`, `evidenceKeyFile` | next to `receiptsFile` | Evidence log and its Ed25519 key (created on first use, `0600`) |
+| `handoffLabel` | `handoff` | Label that marks handoff issues |
 
 ## CLI
 
 ```text
 agent-postbox doctor | inbox | read <n> | comment <n> --body ... | label <n> --add a --remove b
 agent-postbox propose --title ... --body-file ... | review <n> --event approve|request-changes|comment --body ...
+agent-postbox handoff create --to <agent> --title ... --body ... [--acceptance "a|b"] | handoff read <n>
+agent-postbox handoff ack <n> --read-sha256 <hex> --result done|partial|blocked|declined [--evidence "a|b"]
 agent-postbox receipts list | receipts resolve <key> --as confirmed|failed
-agent-postbox serve
+agent-postbox evidence verify | evidence key
+agent-postbox serve [--transport stdio|http] [--host 127.0.0.1] [--port 8471]
 ```
 
 All output is JSON. Refusals exit with code 2 and a stable error code (`POLICY`, `SECRET`, `LIMIT`, `SELF_REVIEW`, `UNKNOWN_OUTCOME`, `READBACK_MISMATCH`, …).
 
-## Known limits (v0.1)
+## Evidence log (v0.2)
+
+Next to the receipts file, agent-postbox keeps `<receipts>.evidence.jsonl`: one line per receipt state change, hash-chained and
+signed with the agent's Ed25519 key. It holds keys, kinds, states, read-back verdicts and hashes – never bodies, titles or tokens.
+`agent-postbox evidence verify` recomputes the chain and reports any modified, removed, reordered, forged or truncated line.
+The format is documented in [docs/evidence-format.md](docs/evidence-format.md) and shared with companion tools, so one verifier works for all of them.
+
+## Known limits (v0.2)
 
 - An identical comment text on the same issue is posted only once (replay protection); add context to make a new comment distinct.
 - Duplicate-title checks and reconciliation scan up to 1,000 items. GitHub's issue lists can lag a few seconds behind writes: an agent's own duplicates are caught locally, but two different agents proposing the same title within seconds may both succeed.
 - Adding a `to:<agent>` label creates that label in the repository if it does not exist yet.
 - Reviews and comments are not edited or deleted by agent-postbox – by design.
 - When the MCP server and the CLI share a receipt file, a lock conflict can pause the server for up to 5 seconds, and concurrent processes may exceed a daily limit by a few writes.
+- The HTTP transport is stateless JSON (no SSE, no sessions, no server-initiated messages) and has no TLS; put it behind your own reverse proxy when it leaves the machine. Browsers are kept out by design (JSON content type required, `Host` must name the server, `Origin` refused unless listed in `AGENT_POSTBOX_HTTP_ORIGINS`).
+- The evidence log proves what was written to it, not what bypassed it; see `docs/evidence-format.md` "What it does not prove". Truncation at the end is detected through the signed `.head` sidecar – if the sidecar is deleted, `evidence verify` warns instead of passing cleanly.
 
 ## Security model
 
