@@ -5,12 +5,13 @@
 // Runs in CI (see .github/workflows/live-test.yml). Needs:
 //   DEMO_REPOSITORY   owner/repo of a throwaway test repository
 //   BUILDER_TOKEN, BUILDER_LOGIN, REVIEWER_TOKEN, REVIEWER_LOGIN
-// Creates one proposal issue and one pull request, then closes both.
+// Creates one proposal issue, one handoff issue (v0.2) and one pull request, then closes them.
 
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
-import { GitHub, Mailbox, ReceiptStore, parseConfig } from '../src/index.js';
+import { GitHub, Mailbox, ReceiptStore, EvidenceLog, verifyEvidence, parseConfig } from '../src/index.js';
+import crypto from 'node:crypto';
 
 process.on('uncaughtException', (e) => {
   console.log(`::error title=live-test aborted::${String(e.code || '')} ${String(e.message).replace(/\r?\n/g, ' ')}`);
@@ -29,7 +30,8 @@ const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'postbox-live-'));
 function agent(name, token, login) {
   const config = parseConfig({ repository, agent: name, login, receiptsFile: path.join(dir, `${name}.json`) });
   const github = new GitHub({ owner, repo, token });
-  return { mailbox: new Mailbox({ config, github, receipts: new ReceiptStore(config.receiptsFile) }), token };
+  const evidence = new EvidenceLog(config.evidenceFile, config.evidenceKeyFile);
+  return { mailbox: new Mailbox({ config, github, receipts: new ReceiptStore(config.receiptsFile, { evidence }) }), token, config };
 }
 const builder = agent('builder', env('BUILDER_TOKEN'), env('BUILDER_LOGIN'));
 const reviewer = agent('reviewer', env('REVIEWER_TOKEN'), env('REVIEWER_LOGIN'));
@@ -62,6 +64,7 @@ async function check(name, fn, expect) {
 }
 
 let issue;
+let handoff;
 let pr;
 try {
   await check('builder doctor', async () => { await builder.mailbox.doctor(); return { status: 'OK' }; }, 'OK');
@@ -91,6 +94,41 @@ try {
   await check('credential in comment is refused', () => builder.mailbox.comment({ number: issue, body: 'token ghp_' + 'Zx9'.repeat(12) }), 'SECRET');
 
   // Scaffolding: builder opens a pull request with plain API calls.
+  // v0.2: verifiable handoffs against the real API
+  await check('builder hands off to reviewer', async () => {
+    const r = await builder.mailbox.handoffCreate({ to: 'reviewer', title: `Live test handoff ${run}`, task: 'Synthetic task from the agent-postbox live test.', acceptance: ['Evidence attached'] });
+    handoff = r.number;
+    return r;
+  }, 'CONFIRMED');
+  let read;
+  await check('reviewer reads the handoff', async () => {
+    read = await reviewer.mailbox.handoffRead({ number: handoff });
+    return { status: read.handoff && read.to.includes('reviewer') ? 'OK' : 'NOT_A_HANDOFF' };
+  }, 'OK');
+  await check('DONE without evidence is refused', () => reviewer.mailbox.handoffAck({ number: handoff, read_sha256: read.body_sha256, result: 'DONE', evidence: [] }), 'POLICY');
+  await check('builder cannot acknowledge a handoff addressed to reviewer', async () => {
+    const own = await builder.mailbox.handoffRead({ number: handoff });
+    return builder.mailbox.handoffAck({ number: handoff, read_sha256: own.body_sha256, result: 'DONE', evidence: ['x'] });
+  }, 'POLICY');
+  await check('ack after the handoff was edited is refused', async () => {
+    await raw(builder.token, 'PATCH', `/issues/${handoff}`, { body: `${read.body}\n\nEdited after reading (live test).` });
+    return reviewer.mailbox.handoffAck({ number: handoff, read_sha256: read.body_sha256, result: 'DONE', evidence: [`live test run ${run}`] });
+  }, 'READBACK_MISMATCH');
+  await check('ack bound to the re-read text is confirmed', async () => {
+    const again = await reviewer.mailbox.handoffRead({ number: handoff });
+    return reviewer.mailbox.handoffAck({ number: handoff, read_sha256: again.body_sha256, result: 'DONE', evidence: [`live test run ${run}`] });
+  }, 'CONFIRMED');
+  await check('handoff shows as acknowledged', async () => {
+    const r = await builder.mailbox.handoffRead({ number: handoff });
+    return { status: r.acknowledged ? 'OK' : 'NOT_ACKNOWLEDGED' };
+  }, 'OK');
+  for (const a of [['builder', builder], ['reviewer', reviewer]]) {
+    await check(`${a[0]} evidence log verifies`, async () => {
+      const v = verifyEvidence(a[1].config.evidenceFile, crypto.createPublicKey(fs.readFileSync(`${a[1].config.evidenceKeyFile}.pub`, 'utf8')));
+      return { status: v.ok && v.entries > 0 ? 'OK' : 'INVALID ' + JSON.stringify(v.problems || []).slice(0, 200) };
+    }, 'OK');
+  }
+
   await check('scaffolding: builder opens a PR (raw API)', async () => {
     const main = await raw(builder.token, 'GET', '/git/ref/heads/main');
     const branch = `live-test-${run.replace(/[^0-9a-z-]/gi, '-')}`;
@@ -109,7 +147,7 @@ try {
   results.push({ ok: false, name: 'aborted', expect: '-', outcome: e.message });
 } finally {
   // Cleanup with raw API (the tool has no close endpoint by design).
-  for (const n of [pr, issue].filter(Boolean)) {
+  for (const n of [pr, handoff, issue].filter(Boolean)) {
     try { await raw(builder.token, 'PATCH', `/issues/${n}`, { state: 'closed' }); } catch (e) { console.log(`cleanup #${n}: ${e.message}`); }
   }
 }
