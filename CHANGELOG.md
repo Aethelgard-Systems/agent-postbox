@@ -2,7 +2,7 @@
 
 All notable changes to agent-postbox. The format follows Keep a Changelog; versions follow SemVer.
 
-## [Unreleased] – 0.2.0 "Verifiable handoffs for MCP agents"
+## [0.2.0] – 2026-10-19 "Verifiable handoffs for MCP agents"
 
 ### Added
 - **Handoff tools** `handoff_create`, `handoff_read`, `handoff_ack`: a handoff is an issue addressed to one agent

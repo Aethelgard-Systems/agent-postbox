@@ -16,22 +16,9 @@ builder ── comment ───▶ evidence: tests, output, links
 human ───────────────▶ merges. Agents cannot merge, close, or set authority labels.
 ```
 
-## Why
-
-Multi-agent setups usually fail in boring ways: an agent claims it posted something it did not, posts the same thing twice after a timeout, approves its own work, treats text in an issue as an order, or leaks a token into a comment. `agent-postbox` addresses exactly those failure modes and nothing else.
-
-| Problem | What agent-postbox does |
-|---|---|
-| "I posted it" – but nothing is there | **Read-back**: every write is fetched again and compared before it counts as done |
-| Timeout → retry → duplicate | **Write receipts**: `ATTEMPTED` is stored before sending, `CONFIRMED` after read-back. An unknown outcome is reconciled only if GitHub shows the exact write by the agent's own identity; otherwise it stays blocked until a human resolves it |
-| Agent approves its own PR | **Four-eyes**: any review (including comments) is refused when the PR author is the token's own identity, which is verified against GitHub; reviews are bound to the head commit |
-| Agent decides things it should only propose | **Authority separation**: protected labels (e.g. `approved`, `decision:*`) are human-only; proposals carry an explicit no-authority footer |
-| Agent can do anything the token can | **Bounded writes**: a fixed endpoint allowlist – no merge, close, delete, body edit, settings or code access |
-| Token or password ends up in a comment | **Secret filter** on every title and body (best effort, see Security) |
-| Issue text tries to instruct the agent | All read content is marked as **untrusted data** |
-| Runaway agent | **Daily limits** for writes and proposals |
-| "Done" – but done *what*, against which version of the task? | **Handoffs** (v0.2): a task issue with acceptance criteria; the acknowledgement is bound to the hash of the text the agent read and needs evidence |
-| Logs can be edited after the fact | **Evidence log** (v0.2): every receipt state change is hash-chained and Ed25519-signed; `evidence verify` catches edits, gaps and truncation |
+> **A shared inbox delivers a message. agent-postbox proves the handoff happened** – read-back of every write, an acknowledgement bound to the exact text the agent read, no self-review, and a signed evidence log you can verify.
+>
+> Release: **v0.2.0** · For: developers running several coding agents (Claude Code, Codex, Cursor, …) on one GitHub repo · Zero runtime dependencies.
 
 ## Try it in 30 seconds
 
@@ -48,6 +35,23 @@ Windows PowerShell blocks `npm` with “running scripts is disabled on this syst
 You will see a builder and a reviewer hand work to each other, a lost network response reconciled instead of posted twice, and three unsafe actions refused (self-review, a human-only label, a token in a comment). Details and limits: [`examples/offline-demo`](examples/offline-demo/).
 
 `npm run demo:handoff` shows the v0.2 flow: a planner hands a task to a builder, the builder's acknowledgement is bound to the text it read (an edited handoff is refused until re-read), and the signed evidence log is verified – then tampered with and caught.
+
+## Why
+
+Multi-agent setups usually fail in boring ways: an agent claims it posted something it did not, posts the same thing twice after a timeout, approves its own work, treats text in an issue as an order, or leaks a token into a comment. `agent-postbox` addresses exactly those failure modes and nothing else.
+
+| Problem | What agent-postbox does |
+|---|---|
+| "I posted it" – but nothing is there | **Read-back**: every write is fetched again and compared before it counts as done |
+| Timeout → retry → duplicate | **Write receipts**: `ATTEMPTED` is stored before sending, `CONFIRMED` after read-back. An unknown outcome is reconciled only if GitHub shows the exact write by the agent's own identity; otherwise it stays blocked until a human resolves it |
+| Agent approves its own PR | **Four-eyes**: any review (including comments) is refused when the PR author is the token's own identity, which is verified against GitHub; reviews are bound to the head commit |
+| Agent decides things it should only propose | **Authority separation**: protected labels (e.g. `approved`, `decision:*`) are human-only; proposals carry an explicit no-authority footer |
+| Agent can do anything the token can | **Bounded writes**: a fixed endpoint allowlist – no merge, close, delete, body edit, settings or code access |
+| Token or password ends up in a comment | **Secret filter** on every title and body (best effort, see Security) |
+| Issue text tries to instruct the agent | All read content is marked as **untrusted data** |
+| Runaway agent | **Daily limits** for writes and proposals |
+| "Done" – but done *what*, against which version of the task? | **Handoffs** (v0.2): a task issue with acceptance criteria; the acknowledgement is bound to the hash of the text the agent read and needs evidence |
+| Logs can be edited after the fact | **Evidence log** (v0.2): every receipt state change is hash-chained and Ed25519-signed; `evidence verify` catches edits, gaps and truncation |
 
 ## Non-goals
 
