@@ -1,3 +1,5 @@
+<p align="center"><img src="https://raw.githubusercontent.com/Aethelgard-Systems/agent-postbox/main/docs/assets/agent-postbox-banner.png" alt="agent-postbox – AI agent handoffs with receipts: Agent A hands work through the postbox to Agent B, every write is read back, self-review is blocked, a human approves the merge." width="100%"></p>
+
 # agent-postbox
 
 **Verifiable handoffs for MCP agents. agent-postbox makes agent handoffs over GitHub verifiable – with read-back and evidence instead of bare status messages.**
