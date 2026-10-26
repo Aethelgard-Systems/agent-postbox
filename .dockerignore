@@ -1,0 +1,6 @@
+.git
+node_modules
+*.log
+*.tmp
+agent-postbox.config.json
+.env
