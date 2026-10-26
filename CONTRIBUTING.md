@@ -10,6 +10,15 @@ Thanks for considering a contribution. agent-postbox stays deliberately small; p
 - Tests use synthetic data only. Never commit real tokens, names or repository data.
 - Run `npm test` before opening a pull request.
 
+## Running tests in Docker (offline)
+
+You can run the full test suite in an isolated container without network access:
+
+```bash
+docker build -f Dockerfile.test -t agent-postbox-test .
+docker run --rm --network none agent-postbox-test
+```
+
 ## Contributions and Developer Certificate of Origin
 
 Contributions are welcome.
