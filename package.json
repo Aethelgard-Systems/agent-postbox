@@ -1,9 +1,18 @@
 {
   "name": "agent-postbox",
+  "mcpName": "io.github.Aethelgard-Systems/agent-postbox",
   "version": "0.2.0",
   "description": "Verifiable handoffs for MCP agents: AI coworkers collaborate through GitHub Issues and PRs with bounded writes, receipts, read-back and a signed evidence log.",
   "license": "Apache-2.0",
   "author": "Marco Gernand",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/Aethelgard-Systems/agent-postbox.git"
+  },
+  "homepage": "https://github.com/Aethelgard-Systems/agent-postbox#readme",
+  "bugs": {
+    "url": "https://github.com/Aethelgard-Systems/agent-postbox/issues"
+  },
   "type": "module",
   "bin": {
     "agent-postbox": "src/cli.js"
