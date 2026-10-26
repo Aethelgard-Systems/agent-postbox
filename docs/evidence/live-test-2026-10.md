@@ -70,3 +70,4 @@ Durations are wall-clock per CLI call (process start included). `rc=2` is the do
 - Sandbox state after the run: issues #1 and #3 and PR #2 left open as public evidence; nothing merged.
 - Receipts, evidence logs and keys stayed outside the repository in a private state directory (`0700`, files `0600`); a scan of that directory for token patterns found none.
 - The run used two identities but one operator. It shows that the tool enforces its rules against the real API; it does not show two independent agents.
+- Identity A is the maintainer's personal account. The agent-side review by A and a later human approval therefore appear under the **same GitHub account** – correctly logged, but not a separation of human and agent. Follow-up tests use a dedicated bot identity for A, with the maintainer acting only as the human reviewer.
