@@ -55,7 +55,7 @@ function setup(configPath) {
   return { config, receipts, mailbox: new Mailbox({ config, github, receipts }) };
 }
 
-/** Mailbox for stdio serve: set up once on first use; a CONFIG/TOKEN failure is reported on every tool call. */
+/** Mailbox for stdio serve: set up once at start; if that fails with CONFIG/TOKEN, every tool call reports it (restart after fixing the config). */
 function deferredMailbox(configPath) {
   let real = null;
   let setupError = null;
