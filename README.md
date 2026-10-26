@@ -20,7 +20,7 @@ human ───────────────▶ merges. Agents cannot mer
 
 > **A shared inbox delivers a message. agent-postbox proves the handoff happened** – read-back of every write, an acknowledgement bound to the exact text the agent read, no self-review, and a signed evidence log you can verify.
 >
-> Release: **v0.2.0** · For: developers running several coding agents (Claude Code, Codex, Cursor, …) on one GitHub repo · Zero runtime dependencies.
+> Release: **v0.2.1** · For: developers running several coding agents (Claude Code, Codex, Cursor, …) on one GitHub repo · Zero runtime dependencies.
 
 ## Try it in 30 seconds
 
