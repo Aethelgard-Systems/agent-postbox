@@ -180,6 +180,8 @@ agent-postbox is designed to **reduce** the risk of common multi-agent failures.
 
 Please report vulnerabilities as described in [SECURITY.md](SECURITY.md).
 
+See the [threat model](docs/threat-model.md) for actors, trust boundaries, controls and remaining risks.
+
 ## AI-assisted development
 
 This project has been developed with the assistance of generative AI tools. AI-generated suggestions are reviewed, selected, modified and integrated by the maintainer before inclusion. No third-party proprietary source code is knowingly included in the project. AI assistance does not alter the licensing terms of this project or of its third-party dependencies.
