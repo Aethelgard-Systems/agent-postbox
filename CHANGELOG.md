@@ -4,13 +4,23 @@ All notable changes to agent-postbox. The format follows Keep a Changelog; versi
 
 ## [Unreleased]
 
+## [0.2.1] – 2026-10-26
+
 ### Changed
 - `serve` over **stdio** now starts without a config file or token: `initialize` and `tools/list` work (needed by MCP
   clients and directory checks such as Glama), and every tool call returns the original `CONFIG`/`TOKEN` error. Nothing
-  is read from or written to GitHub without a valid setup. `serve --transport http` still refuses to start.
+  is read from or written to GitHub without a valid setup. `serve --transport http` still refuses to start (#19).
 
 ### Added
 - `Dockerfile` (node:22-alpine, non-root) that starts the stdio server for directory checks.
+- MCP Registry and Glama listing metadata: `mcpName` and `repository` in `package.json`, `server.json` (official MCP
+  Registry), `glama.json` and `docs/listing.md` (#17).
+- `docs/evidence/live-test-2026-10.md`: live test of v0.2.0 with real identities against the real GitHub API (#18).
+- `docs/threat-model.md`: actors, assets, trust boundaries and attack → control → remaining risk for 11 cases; linked
+  from the README security section (#20).
+
+### Compatibility
+- No breaking changes, no new runtime dependencies. Configuration, receipt and evidence files are unchanged.
 
 ## [0.2.0] – 2026-10-19 "Verifiable handoffs for MCP agents"
 
