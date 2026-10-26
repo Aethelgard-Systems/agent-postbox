@@ -160,6 +160,7 @@ The format is documented in [docs/evidence-format.md](docs/evidence-format.md) a
 - Duplicate-title checks and reconciliation scan up to 1,000 items. GitHub's issue lists can lag a few seconds behind writes: an agent's own duplicates are caught locally, but two different agents proposing the same title within seconds may both succeed.
 - Adding a `to:<agent>` label creates that label in the repository if it does not exist yet.
 - Reviews and comments are not edited or deleted by agent-postbox – by design.
+- `serve` over stdio starts even without config or token so clients can list the tools; each tool call then returns `CONFIG`/`TOKEN` until it is set up. The HTTP transport refuses to start instead.
 - When the MCP server and the CLI share a receipt file, a lock conflict can pause the server for up to 5 seconds, and concurrent processes may exceed a daily limit by a few writes.
 - The HTTP transport is stateless JSON (no SSE, no sessions, no server-initiated messages) and has no TLS; put it behind your own reverse proxy when it leaves the machine. Browsers are kept out by design (JSON content type required, `Host` must name the server, `Origin` refused unless listed in `AGENT_POSTBOX_HTTP_ORIGINS`).
 - The evidence log proves what was written to it, not what bypassed it; see `docs/evidence-format.md` "What it does not prove". Truncation at the end is detected through the signed `.head` sidecar – if the sidecar is deleted, `evidence verify` warns instead of passing cleanly.
