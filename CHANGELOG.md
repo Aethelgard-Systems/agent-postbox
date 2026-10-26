@@ -2,6 +2,16 @@
 
 All notable changes to agent-postbox. The format follows Keep a Changelog; versions follow SemVer.
 
+## [Unreleased]
+
+### Changed
+- `serve` over **stdio** now starts without a config file or token: `initialize` and `tools/list` work (needed by MCP
+  clients and directory checks such as Glama), and every tool call returns the original `CONFIG`/`TOKEN` error. Nothing
+  is read from or written to GitHub without a valid setup. `serve --transport http` still refuses to start.
+
+### Added
+- `Dockerfile` (node:22-alpine, non-root) that starts the stdio server for directory checks.
+
 ## [0.2.0] – 2026-10-19 "Verifiable handoffs for MCP agents"
 
 ### Added

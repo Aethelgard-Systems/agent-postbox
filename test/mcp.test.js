@@ -60,3 +60,39 @@ test('MCP: inherited property names are rejected as input errors', async (t) => 
     assert.equal(JSON.parse(r.result.content[0].text).error, 'INPUT', k);
   }
 });
+
+test('CLI: stdio serve without config/token answers initialize and tools/list, tool calls report CONFIG', async (t) => {
+  const { dir } = setup(t);
+  const cli = new URL('../src/cli.js', import.meta.url).pathname;
+  const env = { ...process.env };
+  delete env.AGENT_POSTBOX_TOKEN; delete env.AGENT_POSTBOX_CONFIG;
+  const child = spawn(process.execPath, [cli, 'serve'], { cwd: dir, env });
+  t.after(() => child.kill());
+  let out = '';
+  const next = () => new Promise((resolve) => {
+    const check = () => { const i = out.indexOf('\n'); if (i >= 0) { const l = out.slice(0, i); out = out.slice(i + 1); resolve(JSON.parse(l)); } else child.stdout.once('data', (b) => { out += b; check(); }); };
+    check();
+  });
+  child.stdin.write(JSON.stringify({ jsonrpc: '2.0', id: 1, method: 'initialize', params: { protocolVersion: '2025-03-26', capabilities: {}, clientInfo: { name: 't', version: '0' } } }) + '\n');
+  assert.equal((await next()).result.protocolVersion, '2025-03-26');
+  child.stdin.write(JSON.stringify({ jsonrpc: '2.0', id: 2, method: 'tools/list' }) + '\n');
+  assert.equal((await next()).result.tools.length, 9);
+  child.stdin.write(JSON.stringify({ jsonrpc: '2.0', id: 3, method: 'tools/call', params: { name: 'inbox', arguments: {} } }) + '\n');
+  const call = await next();
+  assert.equal(call.result.isError, true);
+  assert.equal(JSON.parse(call.result.content[0].text).error, 'CONFIG');
+});
+
+test('CLI: http serve without config still refuses to start', async (t) => {
+  const { dir } = setup(t);
+  const cli = new URL('../src/cli.js', import.meta.url).pathname;
+  const env = { ...process.env };
+  delete env.AGENT_POSTBOX_TOKEN; delete env.AGENT_POSTBOX_CONFIG;
+  const child = spawn(process.execPath, [cli, 'serve', '--transport', 'http', '--port', '18471'], { cwd: dir, env });
+  t.after(() => child.kill());
+  let err = '';
+  child.stderr.on('data', (b) => { err += b; });
+  const code = await new Promise((resolve) => child.on('exit', resolve));
+  assert.notEqual(code, 0);
+  assert.match(err, /CONFIG|config/);
+});

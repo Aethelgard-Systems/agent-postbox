@@ -55,6 +55,25 @@ function setup(configPath) {
   return { config, receipts, mailbox: new Mailbox({ config, github, receipts }) };
 }
 
+/** Mailbox for stdio serve: set up once on first use; a CONFIG/TOKEN failure is reported on every tool call. */
+function deferredMailbox(configPath) {
+  let real = null;
+  let setupError = null;
+  try {
+    real = setup(configPath).mailbox;
+  } catch (e) {
+    if (!(e instanceof PostboxError) || !['CONFIG', 'TOKEN'].includes(e.code)) throw e;
+    setupError = e;
+    process.stderr.write(`agent-postbox: not configured (${e.code}: ${e.message}); tools will report this error\n`);
+  }
+  return new Proxy({}, {
+    get(_t, prop) {
+      if (real) return typeof real[prop] === 'function' ? real[prop].bind(real) : real[prop];
+      return () => { throw setupError; };
+    },
+  });
+}
+
 const list = (s) => (s ? s.split(',').map((x) => x.trim()).filter(Boolean) : []);
 const num = (s) => {
   const n = Number(s);
@@ -99,9 +118,13 @@ export async function main(argv = process.argv.slice(2)) {
     return;
   }
   if (cmd === 'serve') {
-    const { mailbox } = setup(v.config);
+    const http = (v.transport || 'stdio') === 'http';
+    // stdio: start even without config/token so MCP clients and directory checks (e.g. Glama) can run
+    // initialize/tools/list. Every tool call then fails with the original CONFIG/TOKEN error – nothing is
+    // read from or written to GitHub without a valid setup. HTTP stays strict: it may be reachable by others.
+    const mailbox = http ? setup(v.config).mailbox : deferredMailbox(v.config);
     const server = createServer({ name: 'agent-postbox', version: VERSION, instructions: INSTRUCTIONS, tools: tools(mailbox) });
-    if ((v.transport || 'stdio') === 'http') {
+    if (http) {
       const port = Number(v.port || 8471);
       if (!Number.isInteger(port) || port < 1 || port > 65535) throw new PostboxError('INPUT', '--port must be 1-65535');
       const bearer = process.env.AGENT_POSTBOX_HTTP_TOKEN || null; // non-loopback binds require it
