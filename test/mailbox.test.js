@@ -99,6 +99,22 @@ test('a definite 4xx rejection is recorded as FAILED and may be retried', async 
   assert.equal((await mailbox.comment({ number: 4, body: 'Synthetic body' })).status, 'CONFIRMED');
 });
 
+test('successful read-back with mismatched body remains UNVERIFIED', async (t) => {
+  const { mailbox, gh, github, receipts } = setup(t);
+  gh.addIssue(4);
+  const request = github.request.bind(github);
+  github.request = async (method, endpoint, options) => {
+    const result = await request(method, endpoint, options);
+    return method === 'GET' && endpoint.includes('/issues/comments/')
+      ? { ...result, data: { ...result.data, body: 'Synthetic different body' } }
+      : result;
+  };
+  const error = await mailbox.comment({ number: 4, body: 'Synthetic expected body' }).catch((e) => e);
+  assert.equal(error.code, 'READBACK_MISMATCH');
+  assert.equal(receipts.get(error.details.receipt).state, STATE.UNVERIFIED);
+  assert.equal(writes(gh).length, 1);
+});
+
 test('receipt persistence failure blocks the write before it is sent', async (t) => {
   const { mailbox, gh, receipts, dir } = setup(t);
   gh.addIssue(4);
