@@ -70,12 +70,49 @@ test('unknown outcome without evidence blocks the retry until a human resolves i
   assert.equal(gh.comments.size, 1);
 });
 
+test('delayed read-back stays UNVERIFIED and reconciles only the own write without retry', async (t) => {
+  const { mailbox, gh, receipts } = setup(t);
+  gh.addIssue(4);
+  gh.delayNextCommentReads = 2;
+  const error = await mailbox.comment({ number: 4, body: 'Synthetic delayed write.' }).catch((e) => e);
+  assert.equal(error.code, 'READBACK_MISMATCH');
+  assert.equal(receipts.get(error.details.receipt).state, STATE.UNVERIFIED);
+  assert.equal(gh.comments.size, 1);
+  const own = [...gh.comments.values()][0];
+  // An immediately visible exact marker/body by a different identity must not reconcile.
+  gh.comments.set(9999, { ...own, id: 9999, user: { login: 'other-agent-bot' } });
+  await assert.rejects(mailbox.comment({ number: 4, body: 'Synthetic delayed write.' }), { code: 'UNKNOWN_OUTCOME' });
+  assert.equal(receipts.get(error.details.receipt).state, STATE.UNVERIFIED);
+  assert.equal(writes(gh).length, 1);
+  const result = await mailbox.comment({ number: 4, body: 'Synthetic delayed write.' });
+  assert.equal(result.reconciled, true);
+  assert.equal(result.comment_id, own.id);
+  assert.equal(receipts.get(result.receipt).state, STATE.CONFIRMED);
+  assert.equal(writes(gh).length, 1);
+});
+
 test('a definite 4xx rejection is recorded as FAILED and may be retried', async (t) => {
   const { mailbox, gh } = setup(t);
   gh.addIssue(4);
   gh.failNext = { method: 'POST', path: '/repos', status: 422 };
   await assert.rejects(mailbox.comment({ number: 4, body: 'Synthetic body' }), { code: 'GITHUB' });
   assert.equal((await mailbox.comment({ number: 4, body: 'Synthetic body' })).status, 'CONFIRMED');
+});
+
+test('successful read-back with mismatched body remains UNVERIFIED', async (t) => {
+  const { mailbox, gh, github, receipts } = setup(t);
+  gh.addIssue(4);
+  const request = github.request.bind(github);
+  github.request = async (method, endpoint, options) => {
+    const result = await request(method, endpoint, options);
+    return method === 'GET' && endpoint.includes('/issues/comments/')
+      ? { ...result, data: { ...result.data, body: 'Synthetic different body' } }
+      : result;
+  };
+  const error = await mailbox.comment({ number: 4, body: 'Synthetic expected body' }).catch((e) => e);
+  assert.equal(error.code, 'READBACK_MISMATCH');
+  assert.equal(receipts.get(error.details.receipt).state, STATE.UNVERIFIED);
+  assert.equal(writes(gh).length, 1);
 });
 
 test('receipt persistence failure blocks the write before it is sent', async (t) => {

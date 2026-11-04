@@ -15,8 +15,16 @@ export function fakeGitHub({ owner = 'example-org', repo = 'example-repo', login
     nextId: 1000,
     failNext: null, // { method, path, status } or { method, path, network: true }
     dropNextWrite: false, // simulate a lost response: write applied, client sees network error
+    delayNextCommentReads: 0, // hide the next comment from this many direct/list GETs
+    delayedComments: new Map(),
   };
   const html = (p) => `https://github.com/${owner}/${repo}${p}`;
+  const commentVisible = (comment) => {
+    const remaining = state.delayedComments.get(comment.id) || 0;
+    if (!remaining) return true;
+    state.delayedComments.set(comment.id, remaining - 1);
+    return false;
+  };
   const json = (status, data, headers = {}) => ({
     ok: status >= 200 && status < 300,
     status,
@@ -72,14 +80,16 @@ export function fakeGitHub({ owner = 'example-org', repo = 'example-repo', login
     if ((m = path.match(new RegExp(`^${base}/issues/(\\d+)/comments$`)))) {
       const n = Number(m[1]);
       if (!state.issues.has(n)) return json(404, { message: 'Not Found' });
-      if (method === 'GET') return json(200, [...state.comments.values()].filter((c) => c.issue === n));
+      if (method === 'GET') return json(200, [...state.comments.values()].filter((c) => c.issue === n && commentVisible(c)));
       const id = state.nextId++;
       state.comments.set(id, { id, issue: n, body: body.body, user: { login }, created_at: '2026-01-01T00:00:00Z', html_url: html(`/issues/${n}#issuecomment-${id}`) });
+      state.delayedComments.set(id, state.delayNextCommentReads);
+      state.delayNextCommentReads = 0;
       return lost(json(201, state.comments.get(id)));
     }
     if ((m = path.match(new RegExp(`^${base}/issues/comments/(\\d+)$`))) && method === 'GET') {
       const c = state.comments.get(Number(m[1]));
-      return c ? json(200, c) : json(404, { message: 'Not Found' });
+      return c && commentVisible(c) ? json(200, c) : json(404, { message: 'Not Found' });
     }
     if ((m = path.match(new RegExp(`^${base}/issues/(\\d+)/labels(?:/(.+))?$`)))) {
       const i = state.issues.get(Number(m[1]));
