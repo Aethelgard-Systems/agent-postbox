@@ -114,6 +114,10 @@ export function verify(file, publicKey) {
       problems.push({ line: ln, reason: 'not JSON' });
       return;
     }
+    if (e === null || typeof e !== 'object' || Array.isArray(e)) {
+      problems.push({ line: ln, reason: 'not an object' });
+      return;
+    }
     const keys = Object.keys(e).sort().join(',');
     if (keys !== [...FIELDS, 'hash', 'sig'].sort().join(',')) {
       problems.push({ line: ln, reason: 'unexpected fields' });
