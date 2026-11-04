@@ -70,6 +70,27 @@ test('unknown outcome without evidence blocks the retry until a human resolves i
   assert.equal(gh.comments.size, 1);
 });
 
+test('delayed read-back stays UNVERIFIED and reconciles only the own write without retry', async (t) => {
+  const { mailbox, gh, receipts } = setup(t);
+  gh.addIssue(4);
+  gh.delayNextCommentReads = 2;
+  const error = await mailbox.comment({ number: 4, body: 'Synthetic delayed write.' }).catch((e) => e);
+  assert.equal(error.code, 'READBACK_MISMATCH');
+  assert.equal(receipts.get(error.details.receipt).state, STATE.UNVERIFIED);
+  assert.equal(gh.comments.size, 1);
+  const own = [...gh.comments.values()][0];
+  // An immediately visible exact marker/body by a different identity must not reconcile.
+  gh.comments.set(9999, { ...own, id: 9999, user: { login: 'other-agent-bot' } });
+  await assert.rejects(mailbox.comment({ number: 4, body: 'Synthetic delayed write.' }), { code: 'UNKNOWN_OUTCOME' });
+  assert.equal(receipts.get(error.details.receipt).state, STATE.UNVERIFIED);
+  assert.equal(writes(gh).length, 1);
+  const result = await mailbox.comment({ number: 4, body: 'Synthetic delayed write.' });
+  assert.equal(result.reconciled, true);
+  assert.equal(result.comment_id, own.id);
+  assert.equal(receipts.get(result.receipt).state, STATE.CONFIRMED);
+  assert.equal(writes(gh).length, 1);
+});
+
 test('a definite 4xx rejection is recorded as FAILED and may be retried', async (t) => {
   const { mailbox, gh } = setup(t);
   gh.addIssue(4);
