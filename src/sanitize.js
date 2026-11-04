@@ -18,7 +18,9 @@ const SECRET_PATTERNS = [
   ['private-key-block', /-----BEGIN (?:[A-Z]+ )?PRIVATE KEY-----/],
   ['jwt', /\beyJ[A-Za-z0-9_-]{10,}\.eyJ[A-Za-z0-9_-]{10,}\.[A-Za-z0-9_-]{10,}\b/],
   ['url-credentials', /\b[a-z][a-z0-9+.-]*:\/\/[^\s:/@]+:[^\s@/]{6,}@/i],
-  ['assignment', /\b(?:password|passwd|secret|api[_-]?key|access[_-]?token|client[_-]?secret)\s*[:=]\s*["']?[^\s"']{8,}/i],
+  // Match credential suffixes in names such as db_password and service-api-key.
+  // The assignment delimiter must immediately follow the credential name.
+  ['assignment', /\b(?:[a-z0-9]+[_-])*(?:password|passwd|secret|api[_-]?key|access[_-]?token|client[_-]?secret)\s*[:=]\s*["']?[^\s"']{8,}/i],
 ];
 
 function entropy(s) {
