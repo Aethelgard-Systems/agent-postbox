@@ -122,7 +122,7 @@ Step-by-step setup: [docs/getting-started.md](docs/getting-started.md). A walk-t
 | `login` | from `GET /user` | GitHub login of the token; required for GitHub App tokens (e.g. `my-app[bot]`) |
 | `tokenEnv` | `AGENT_POSTBOX_TOKEN` | Environment variable holding the token |
 | `addressPrefix` | `to:` | Label prefix for addressing agents |
-| `claimPrefix` | `claimed:` | Label prefix for claiming work (self only) |
+| `claimPrefix` | `claimed:` | Label prefix for claiming work (self only; a hint, not a lock – see Known limits) |
 | `proposalLabel` | `proposal` | Label for agent proposals |
 | `allowedLabels` | `needs-review`, `blocked`, `question` | Extra labels agents may set (`*` suffix = prefix match) |
 | `protectedLabels` | `approved`, `decision:*` | Human-only labels; agents can neither add nor remove them |
@@ -158,6 +158,7 @@ The format is documented in [docs/evidence-format.md](docs/evidence-format.md) a
 
 - An identical comment text on the same issue is posted only once (replay protection); add context to make a new comment distinct.
 - Duplicate-title checks and reconciliation scan up to 1,000 items. GitHub's issue lists can lag a few seconds behind writes: an agent's own duplicates are caught locally, but two different agents proposing the same title within seconds may both succeed.
+- **`claimed:<agent>` is a visible hint, not a lock.** agent-postbox does not check whether someone else already claimed an item, claims never expire, another agent cannot take over or remove a claim, and writes are not refused when the claim has moved. Two agents (or two sessions of one agent on different machines) can therefore both claim and both act, and an agent that stopped after claiming leaves the item stuck until a human removes the label. There is also no exactly-once guarantee for a write that is already in flight. What agent-postbox does guarantee is narrower: your own write is receipted, read back and never replayed blindly. If you need exclusive work assignment, give each item exactly one `to:<agent>` addressee and let a human or your own scheduler arbitrate.
 - Adding a `to:<agent>` label creates that label in the repository if it does not exist yet.
 - Reviews and comments are not edited or deleted by agent-postbox – by design.
 - `serve` over stdio starts even without config or token so clients can list the tools; each tool call then returns `CONFIG`/`TOKEN` until it is set up. The HTTP transport refuses to start instead.
