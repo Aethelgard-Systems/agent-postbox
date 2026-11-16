@@ -4,6 +4,9 @@ All notable changes to agent-postbox. The format follows Keep a Changelog; versi
 
 ## [Unreleased]
 
+### Docs
+- README: state plainly that `claimed:<agent>` is a visible hint, not a lock (no expiry, no takeover, no check before writes, no exactly-once for in-flight writes).
+
 ## [0.2.1] – 2026-10-26
 
 ### Changed
