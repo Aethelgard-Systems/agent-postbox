@@ -53,6 +53,16 @@ test('grader: blue left behind in a css file → fail; blue only in comments →
   assert.equal(commented.pass, true);
 });
 
+test('grader: comments are removed completely, also when an inner comment is what completes the outer one', () => {
+  const css = (body) => grade({ 'signup.html': withButton(GREEN), 'style.css': body });
+  assert.equal(css('/* blue */ .ok { color: red; }').pass, true);
+  assert.equal(css('/*/* blue */ still comment */ .ok { color: red; }').pass, true);
+  assert.deepEqual(failed(css('.old { background: blue; } /* closed */')), ['no-blue-left']);
+  assert.deepEqual(failed(css('/* never closed */ blue /* open')), ['no-blue-left']);
+  const nested = grade({ 'signup.html': withButton(`<!<!-- x -->-- blue --> ${GREEN}`) });
+  assert.equal(nested.pass, true);
+});
+
 test('grader: label changed → fail; input submit with the right value → pass', () => {
   assert.deepEqual(failed(grade({ 'signup.html': withButton('<button style="background:#2ea043">Join</button>') })), ['label-unchanged']);
   const input = grade({ 'signup.html': withButton('<input type="submit" value="Sign up" style="background:#2ea043">') });

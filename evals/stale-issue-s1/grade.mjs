@@ -17,7 +17,29 @@ const LABEL = 'Sign up';
 const MAX_FILES = 200;
 const MAX_BYTES = 1024 * 1024;
 
-const stripComments = (s) => s.replace(/<!--[\s\S]*?-->/g, '').replace(/\/\*[\s\S]*?\*\//g, '');
+// Removes every complete `open ... close` span, repeatedly, so that text which only becomes a comment after an
+// inner comment is gone (`<!<!-- x -->-- y -->`) is removed too. An unterminated opener is left in place.
+function stripSpans(text, open, close) {
+  let current = text;
+  for (;;) {
+    let out = '';
+    let at = 0;
+    for (;;) {
+      const start = current.indexOf(open, at);
+      const end = start < 0 ? -1 : current.indexOf(close, start + open.length);
+      if (end < 0) {
+        out += current.slice(at);
+        break;
+      }
+      out += current.slice(at, start);
+      at = end + close.length;
+    }
+    if (out === current) return out;
+    current = out;
+  }
+}
+
+const stripComments = (s) => stripSpans(stripSpans(s, '<!--', '-->'), '/*', '*/');
 
 function controls(html) {
   const found = [];
