@@ -7,6 +7,9 @@ All notable changes to agent-postbox. The format follows Keep a Changelog; versi
 ### Added
 - `evals/stale-issue-s1/`: repo-local eval for scenario 1 of #34 (does the agent follow a handoff that changes while it works?). Synthetic fixture, deterministic code grader, run protocol and run-record template; no new dependency. Scenario 2, an LLM judge and a hosted dataset are not part of it.
 
+### Fixed
+- `evals/stale-issue-s1/grade.mjs`: strip comments with a span scanner instead of single-pass regexes, so removing one comment cannot leave a fragment that forms a new one (CodeQL `js/incomplete-multi-character-sanitization`, #41). Eval code only; no change to the package.
+
 ### Docs
 - README: state plainly that `claimed:<agent>` is a visible hint, not a lock (no expiry, no takeover, no check before writes, no exactly-once for in-flight writes).
 
