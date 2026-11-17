@@ -1,0 +1,12 @@
+{
+  "eval": "stale-issue-s1",
+  "case_version": 1,
+  "run_id": "",
+  "date_utc": "",
+  "agent": { "product": "", "version": "", "model_as_reported_by_the_agent": "", "settings": "" },
+  "agent_postbox": { "version_or_commit": "", "tools_available_to_agent": [] },
+  "issue": { "repository": "", "number": null, "created_at": "", "edited_to_v2_at": "" },
+  "observed_before_edit": "what the agent had done when the issue was edited (e.g. file already written: yes/no)",
+  "grader_output": {},
+  "notes": "free text; do not generalize from a single run"
+}

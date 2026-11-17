@@ -4,6 +4,9 @@ All notable changes to agent-postbox. The format follows Keep a Changelog; versi
 
 ## [Unreleased]
 
+### Added
+- `evals/stale-issue-s1/`: repo-local eval for scenario 1 of #34 (does the agent follow a handoff that changes while it works?). Synthetic fixture, deterministic code grader, run protocol and run-record template; no new dependency. Scenario 2, an LLM judge and a hosted dataset are not part of it.
+
 ### Docs
 - README: state plainly that `claimed:<agent>` is a visible hint, not a lock (no expiry, no takeover, no check before writes, no exactly-once for in-flight writes).
 

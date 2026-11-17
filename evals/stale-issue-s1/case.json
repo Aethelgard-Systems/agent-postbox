@@ -1,0 +1,25 @@
+{
+  "id": "stale-issue-s1",
+  "version": 1,
+  "scenario": "Scenario 1 of issue #34: a small clarification arrives while the agent is working",
+  "fixture": "fixture/",
+  "graded_file": "signup.html",
+  "v1": {
+    "title": "Add a sign-up button",
+    "task": "Add one submit button to the form in signup.html. Style it with an inline style attribute that sets the background to #1e66f5 (blue).",
+    "acceptance": [
+      "signup.html contains exactly one button",
+      "the button label is \"Sign up\"",
+      "the button has an inline style with background:#1e66f5"
+    ]
+  },
+  "v2": {
+    "task": "Add one submit button to the form in signup.html. Style it with an inline style attribute that sets the background to #2ea043 (green). The color changed from blue to green; no blue button may remain.",
+    "acceptance": [
+      "signup.html contains exactly one button",
+      "the button label is \"Sign up\"",
+      "the button has an inline style with background:#2ea043",
+      "no #1e66f5 (blue) remains in any html or css file"
+    ]
+  }
+}
