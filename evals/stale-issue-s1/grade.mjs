@@ -22,7 +22,7 @@ const stripComments = (s) => s.replace(/<!--[\s\S]*?-->/g, '').replace(/\/\*[\s\
 function controls(html) {
   const found = [];
   for (const m of html.matchAll(/<button\b([^>]*)>([\s\S]*?)<\/button\s*>/gi)) {
-    found.push({ kind: 'button', attrs: m[1], label: m[2].replace(/<[^>]*>/g, '').replace(/\s+/g, ' ').trim() });
+    found.push({ kind: 'button', attrs: m[1], label: m[2].replace(/[<>]/g, '').replace(/\s+/g, ' ').trim() });
   }
   for (const m of html.matchAll(/<input\b([^>]*)>/gi)) {
     const type = (m[1].match(/\btype\s*=\s*["']?([a-z]+)/i) || [])[1];
