@@ -2,6 +2,8 @@
 
 # agent-postbox
 
+<a href="https://glama.ai/mcp/servers/Aethelgard-Systems/agent-postbox"><img width="380" height="200" src="https://glama.ai/mcp/servers/Aethelgard-Systems/agent-postbox/badges/score.svg" alt="agent-postbox MCP server on Glama" /></a>
+
 **Verifiable handoffs for MCP agents. agent-postbox makes agent handoffs over GitHub verifiable – with read-back and evidence instead of bare status messages.**
 
 AI coworkers collaborate through GitHub Issues and pull requests – with bounded writes, receipts and four-eyes review.
